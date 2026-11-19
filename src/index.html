@@ -8,10 +8,14 @@
 </head>
 <body>
   <header class="topbar">
-    <div class="brand"><span aria-hidden="true">🎂</span> Birthday Battle</div>
-    <nav id="nav" class="nav"></nav>
+    <button id="brand" class="brand" type="button" title="Intro abspielen"><span aria-hidden="true">🎂</span> Birthday Battle</button>
+    <div class="topbar-right">
+      <nav id="nav" class="nav"></nav>
+      <button id="sound-toggle" class="sound-toggle" type="button"></button>
+    </div>
   </header>
   <main id="app" class="app"></main>
+  <script src="sound.js"></script>
   <script src="app.js"></script>
 </body>
 </html>
