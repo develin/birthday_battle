@@ -16,6 +16,8 @@ To check rendering without a browser UI, use headless Edge. `--virtual-time-budg
 & "${env:ProgramFiles(x86)}\Microsoft\Edge\Application\msedge.exe" --headless=new --disable-gpu --user-data-dir="<scratch>\edge" --window-size=1100,800 --virtual-time-budget=8000 --screenshot="<scratch>\shot.png" "file:///C:/.../src/index.html#/scores"
 ```
 
+The README screenshots in `docs/screenshots/` were made this way at 1280×720 with a demo party of six kids. The intro opens on every page load, and opening it stops the wheel. For screen captures, inject a script after `app.js` that removes it (`intro.timers.forEach(clearTimeout); intro.el.remove(); intro = null;`), then call `render()` again.
+
 To test a screen with data, copy `src/` to a scratch folder and inject a `<script>` before `app.js` that calls `localStorage.setItem('birthday-battle-v1', JSON.stringify({...}))`.
 
 ## Architecture

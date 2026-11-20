@@ -2,6 +2,8 @@
 
 A simple scorekeeper for kids' birthday party games. Set up the players, run the games, and watch the scoreboard.
 
+![The intro's start screen: the Birthday Battle title with a cake and the kids' avatars around it](docs/screenshots/intro.png)
+
 ## Getting started
 
 Open `src/index.html` in any modern browser. No install, server or internet connection needed.
@@ -24,6 +26,27 @@ Sound effects are generated in the browser (no sound files). Use the 🔊 button
 - **🎲 Zufall (Glücksrad):** a spinning wheel with every game that's switched on. It turns slowly for 2 seconds, then fast; a kid presses "Stopp!" and the wheel picks the next game. Each time a game is played its slice halves, until every game has had a turn; then everything counts one round less. A new party starts all games from zero. Bonus games are half as likely, but as likely as an unplayed game when the picking kid is 2+ points behind the leader, and 50 % more likely when they're last
 - **Podium:** after each game, a "Sieger" announcement and a podium for the top three, with everyone else on the ground
 - **Scoreboard:** everyone ranked by total points, plus a history of games played
+
+## Screenshots
+
+<table>
+  <tr>
+    <td width="50%"><img src="docs/screenshots/round.png" alt="Round screen: round 5, Ida picks the next game"><br><b>Runde:</b> whose turn it is to pick the game</td>
+    <td width="50%"><img src="docs/screenshots/wheel.png" alt="The Glücksrad spinning, with a big Stopp button"><br><b>Glücksrad:</b> press Stopp (or the space bar) to pick a game</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/game.png" alt="Game in progress: group 1 of 2 with medals and points per kid"><br><b>Spielen:</b> a game played in groups, with medals and points</td>
+    <td><img src="docs/screenshots/team.png" alt="Team game: Team Rot against Team Blau"><br><b>Teamspiel:</b> Team Rot against Team Blau</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/podium.png" alt="Podium after a game: 1st in the middle, 2nd and 3rd at the sides, everyone else on the ground"><br><b>Podium:</b> after every game</td>
+    <td><img src="docs/screenshots/scores.png" alt="Scoreboard with total points and the games played"><br><b>Punktestand:</b> total points and the games played so far</td>
+  </tr>
+  <tr>
+    <td><img src="docs/screenshots/games.png" alt="Game list with player count, team and on/off switches"><br><b>Spiele:</b> the game list and its settings</td>
+    <td></td>
+  </tr>
+</table>
 
 ## Project structure
 
