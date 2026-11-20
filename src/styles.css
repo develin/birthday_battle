@@ -89,7 +89,7 @@ h2 { font-weight: 800; font-size: 1.35rem; margin: 0 0 0.6rem; }
 }
 .brand:hover { color: var(--party); }
 .topbar-right { display: flex; align-items: center; gap: 0.6rem; }
-.sound-toggle {
+.settings-btn {
   display: grid;
   place-items: center;
   width: 2.3rem;
@@ -101,8 +101,31 @@ h2 { font-weight: 800; font-size: 1.35rem; margin: 0 0 0.6rem; }
   font-size: 1.15rem;
   line-height: 1;
 }
-.sound-toggle:hover { border-color: var(--lilac); }
-.sound-toggle[aria-pressed="true"] { opacity: 0.6; }
+.settings-btn:hover { border-color: var(--lilac); }
+
+/* Settings menu */
+.settings-modal { --kid: var(--party); width: min(30rem, 100%); }
+.settings-modal h2 { margin: 0 0 1rem; }
+.setting-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.8rem;
+  padding: 0.9rem 0;
+  border-bottom: 0.12rem solid var(--panel-hi);
+}
+.setting-label { font-weight: 800; font-size: 1.2rem; }
+.lang-choice { display: flex; gap: 0.4rem; }
+.lang-btn {
+  padding: 0.4rem 1rem;
+  border-radius: 999px;
+  border: 0.15rem solid var(--lilac);
+  background: none;
+  font-weight: 800;
+}
+.lang-btn.on { background: var(--party); border-color: var(--party); color: var(--stage); }
+.settings-modal > .btn { margin-top: 1.2rem; }
 .nav { display: flex; gap: 0.3rem; }
 .nav-link {
   padding: 0.3rem 1.1rem;

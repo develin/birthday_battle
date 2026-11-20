@@ -12,9 +12,11 @@ Scores are saved in the browser, so refreshing the page won't lose them.
 
 It's designed to be shown on a TV (720p or higher): put the browser in full screen (F11) and the screens scale to fit.
 
-The app's interface is in German.
+The ⚙️ button in the top bar opens the settings:
+- **Language:** German (default) or English.
+- **Sound:** switch the sound effects off or on. They are generated in the browser, with no sound files.
 
-Sound effects are generated in the browser (no sound files). Use the 🔊 button in the top bar to switch them off or on.
+Both choices are remembered.
 
 ## Features
 
@@ -55,6 +57,7 @@ src/
   index.html   page markup
   styles.css   styling
   app.js       app logic and saved data
+  i18n.js      interface text in German and English
   sound.js     sound effects (generated with Web Audio)
   fonts/       Bungee and Baloo 2 (SIL Open Font License), bundled for offline use
 ```

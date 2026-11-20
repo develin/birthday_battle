@@ -93,10 +93,10 @@ const esc = (s) => String(s).replace(/[&<>"']/g, (c) => (
 const kidById = (id) => state.kids.find((k) => k.id === id);
 const gameById = (id) => state.gameList.find((g) => g.id === id);
 const isReady = () => state.kids.length >= MIN_KIDS && state.kids.every((k) => k.name.trim());
-const kidsLabel = (n) => `${n} ${n === 1 ? 'Kind' : 'Kinder'}`;
-const ptsLabel = (n) => (n === 1 ? 'Punkt' : 'Punkte');
+const kidsLabel = (n) => `${n} ${t('kidsWord', n)}`;
+const ptsLabel = (n) => t('ptsWord', n);
 const pointsText = (n) => `${n} ${ptsLabel(n)}`;
-const place = (n) => `${n}.`; // German ordinal: 1. 2. 3.
+const place = (n) => t('rank', n); // "1." in German, "1st" in English
 const kidStyle = (kid) => `--kid:${esc(kid.color)}`;
 const timesPlayed = (name) => state.games.filter((g) => g.name.toLowerCase() === name.toLowerCase()).length;
 
@@ -149,8 +149,8 @@ const isBonus = (g) => Number(g?.maxPlayers) === 1;
 // A team game is played by everyone at once in two teams, Rot and Blau (the player limit is ignored).
 const isTeam = (g) => Boolean(g?.team) && !isBonus(g);
 const TEAMS = {
-  red: { name: 'Team Rot', icon: '🔴', color: '#FF5D5D' },
-  blue: { name: 'Team Blau', icon: '🔵', color: '#4C9BFF' },
+  red: { get name() { return t('teamRed'); }, icon: '🔴', color: '#FF5D5D' },
+  blue: { get name() { return t('teamBlue'); }, icon: '🔵', color: '#4C9BFF' },
 };
 
 // Kids drawn at random into Rot and Blau; with an odd number, one team has one more kid.
@@ -185,7 +185,7 @@ const zeroResults = (ids) => Object.fromEntries(ids.map((id) => [id, 0]));
 // "Mia, Leo und Zoe"
 function joinNames(ids) {
   const names = ids.map((id) => kidById(id)?.name).filter(Boolean).map(esc);
-  return names.length > 1 ? `${names.slice(0, -1).join(', ')} und ${names[names.length - 1]}` : (names[0] || '');
+  return names.length > 1 ? `${names.slice(0, -1).join(', ')} ${t('and')} ${names[names.length - 1]}` : (names[0] || '');
 }
 
 // Sizes of the groups when `count` kids play a game for up to `max` players:
@@ -215,8 +215,8 @@ function splitGroups(ids, max) {
 function groupPreview(count, max) {
   const sizes = groupSizes(count, max);
   if (sizes.length < 2) return '';
-  const list = `${sizes.slice(0, -1).join(', ')} und ${sizes[sizes.length - 1]}`;
-  return `Wird in ${sizes.length} Gruppen gespielt: ${list} Kinder`;
+  const list = `${sizes.slice(0, -1).join(', ')} ${t('and')} ${sizes[sizes.length - 1]}`;
+  return t('groupPreview', sizes.length, list);
 }
 
 // Points for a bonus game the kid managed: 2 if they are more than 3 points behind
@@ -277,7 +277,7 @@ function ranked(scores, ids) {
   const list = ids
     .map((id) => ({ kid: kidById(id), points: scores[id] || 0 }))
     .filter((r) => r.kid);
-  list.sort((a, b) => b.points - a.points || a.kid.name.localeCompare(b.kid.name, 'de'));
+  list.sort((a, b) => b.points - a.points || a.kid.name.localeCompare(b.kid.name, lang));
   let rank = 0;
   list.forEach((r, i) => {
     if (i === 0 || r.points !== list[i - 1].points) rank = i + 1;
@@ -336,11 +336,11 @@ function renderNav(route, ready) {
     return `<a class="${cls}" href="#/${r}">${label}</a>`;
   };
   const gameLabel = state.current
-    ? 'Spielen <span class="live-dot" title="Ein Spiel läuft gerade"></span>'
-    : 'Spielen';
-  nav.innerHTML = link('setup', 'Kinder', false)
-    + link('games', 'Spiele', false)
-    + link('scores', 'Punkte', true)
+    ? `${t('navPlay')} <span class="live-dot" title="${t('gameRunning')}"></span>`
+    : t('navPlay');
+  nav.innerHTML = link('setup', t('navKids'), false)
+    + link('games', t('navGames'), false)
+    + link('scores', t('navScores'), true)
     + link('round', gameLabel, true);
   // Rounds, picking a game, the wheel, the running game and the final screen all belong to "Spielen".
   if (['game', 'wheel', 'final'].includes(route)) nav.querySelector('[href="#/round"]')?.classList.add('active');
@@ -357,16 +357,16 @@ function playPath() {
 // It is the screen's default unless `isDefault` is false (game results default to the standings).
 function nextStepButton(extraClass = '', isDefault = true) {
   const attrs = `class="btn ${isDefault ? 'primary ' : ''}big ${extraClass}"${isDefault ? ' data-default' : ''}`;
-  if (state.current) return `<button ${attrs} data-action="go-game">Zurück zu ${esc(state.current.name)}</button>`;
-  if (state.partyOver) return `<button ${attrs} data-action="go-final">Endstand zeigen</button>`;
-  return `<button ${attrs} data-action="go-round">Nächste Runde</button>`;
+  if (state.current) return `<button ${attrs} data-action="go-game">${t('backTo', esc(state.current.name))}</button>`;
+  if (state.partyOver) return `<button ${attrs} data-action="go-final">${t('showFinal')}</button>`;
+  return `<button ${attrs} data-action="go-round">${t('nextRound')}</button>`;
 }
 
 // On a game's result screen the default is to look at the total standings.
 function resultButtons(extraClass = 'big') {
   return `
     ${nextStepButton(extraClass, false)}
-    <button class="btn primary ${extraClass}" data-default data-action="go-scores">Zum Punktestand</button>`;
+    <button class="btn primary ${extraClass}" data-default data-action="go-scores">${t('toScores')}</button>`;
 }
 
 // ---------- Setup screen (kids) ----------
@@ -381,29 +381,29 @@ function renderSetup() {
   app.innerHTML = `
     <section class="screen">
       <div class="setup-head">
-        <h1>Wer spielt mit?</h1>
+        <h1>${t('whoPlays')}</h1>
         <div class="stepper">
-          <button class="round-btn" data-action="count-dec" ${n <= MIN_KIDS ? 'disabled' : ''} aria-label="Ein Kind weniger">−</button>
+          <button class="round-btn" data-action="count-dec" ${n <= MIN_KIDS ? 'disabled' : ''} aria-label="${t('oneKidLess')}">−</button>
           <span class="count-num">${n}</span>
-          <button class="round-btn" data-action="count-inc" ${n >= MAX_KIDS ? 'disabled' : ''} aria-label="Ein Kind mehr">+</button>
-          <span class="count-label">${n === 1 ? 'Kind' : 'Kinder'}</span>
+          <button class="round-btn" data-action="count-inc" ${n >= MAX_KIDS ? 'disabled' : ''} aria-label="${t('oneKidMore')}">+</button>
+          <span class="count-label">${t('kidsWord', n)}</span>
         </div>
       </div>
 
       <ol class="kid-list">
         ${state.kids.map((k, i) => `
           <li class="kid-row" style="${kidStyle(k)}">
-            <button class="avatar-btn" data-action="pick-avatar" data-id="${k.id}" title="Bild aussuchen" aria-label="Bild für Kind ${i + 1} aussuchen">${k.avatar}</button>
+            <button class="avatar-btn" data-action="pick-avatar" data-id="${k.id}" title="${t('pickPicture')}" aria-label="${t('pickPictureFor', i + 1)}">${k.avatar}</button>
             <input class="name-input" data-id="${k.id}" type="text" maxlength="20"
-              placeholder="Name von Kind ${i + 1}" value="${esc(k.name)}" autocomplete="off">
+              placeholder="${t('nameOfKid', i + 1)}" value="${esc(k.name)}" autocomplete="off">
           </li>`).join('')}
       </ol>
 
       <details class="settings">
-        <summary>Punkte pro Platz</summary>
+        <summary>${t('pointsPerPlace')}</summary>
         <div class="settings-grid">
           ${[1, 2, 3].map((p) => `
-            <label>${MEDALS[p]} ${place(p)} Platz
+            <label>${MEDALS[p]} ${t('placeN', p)}
               <input class="points-input" data-place="${p}" type="number" min="0" max="99" value="${state.points[p]}">
             </label>`).join('')}
         </div>
@@ -412,8 +412,8 @@ function renderSetup() {
       <p class="form-error" id="setup-error" hidden></p>
 
       <div class="actions">
-        <button class="btn primary big" data-default data-action="setup-done">${started ? 'Speichern und weiterspielen' : "Los geht's! 🎉"}</button>
-        ${started ? '<button class="btn danger" data-action="reset">Neue Party starten</button>' : ''}
+        <button class="btn primary big" data-default data-action="setup-done">${started ? t('saveAndContinue') : t('letsGo')}</button>
+        ${started ? `<button class="btn danger" data-action="reset">${t('newParty')}</button>` : ''}
       </div>
     </section>`;
 }
@@ -426,14 +426,14 @@ function openAvatarPicker(kidId) {
   const overlay = document.createElement('div');
   overlay.className = 'overlay';
   overlay.innerHTML = `
-    <div class="modal" role="dialog" aria-modal="true" aria-label="Bild aussuchen" style="${kidStyle(kid)}">
-      <h2>Such dir ein Bild aus${kid.name.trim() ? `, ${esc(kid.name.trim())}` : ''}!</h2>
+    <div class="modal" role="dialog" aria-modal="true" aria-label="${t('pickPicture')}" style="${kidStyle(kid)}">
+      <h2>${t('pickPictureTitle', esc(kid.name.trim()))}</h2>
       <div class="avatar-grid">
         ${AVATARS.map((a) => `
           <button class="avatar-choice ${a === kid.avatar ? 'selected' : ''}" data-avatar="${a}"
-            ${takenByOthers.has(a) ? 'disabled title="Schon vergeben"' : ''}>${a}</button>`).join('')}
+            ${takenByOthers.has(a) ? `disabled title="${t('taken')}"` : ''}>${a}</button>`).join('')}
       </div>
-      <button class="btn" data-close>Schließen</button>
+      <button class="btn" data-close>${t('close')}</button>
     </div>`;
 
   const close = () => {
@@ -466,9 +466,7 @@ function finishSetup() {
     input.classList.toggle('invalid', empty.some((k) => k.id === input.dataset.id));
   });
   if (empty.length) {
-    errorEl.textContent = empty.length === 1
-      ? 'Ein Kind hat noch keinen Namen.'
-      : `${empty.length} Kinder haben noch keinen Namen.`;
+    errorEl.textContent = empty.length === 1 ? t('noNameOne') : t('noNameMany', empty.length);
     errorEl.hidden = false;
     document.querySelector('.name-input.invalid')?.focus();
     return;
@@ -486,14 +484,14 @@ function renderGameList() {
   app.innerHTML = `
     <section class="screen">
       <div class="setup-head">
-        <h1>Spiele</h1>
-        <span class="count-label">${active} von ${state.gameList.length} Spielen sind an</span>
+        <h1>${t('gamesTitle')}</h1>
+        <span class="count-label">${t('gamesOn', active, state.gameList.length)}</span>
       </div>
 
       <form class="add-game" data-form="add-game">
-        <label class="sr-only" for="new-game">Neues Spiel</label>
-        <input id="new-game" class="text-input" type="text" maxlength="40" placeholder="Neues Spiel, zum Beispiel Wattepusten" autocomplete="off">
-        <button class="btn" type="submit">Hinzufügen</button>
+        <label class="sr-only" for="new-game">${t('newGame')}</label>
+        <input id="new-game" class="text-input" type="text" maxlength="40" placeholder="${t('newGamePlaceholder')}" autocomplete="off">
+        <button class="btn" type="submit">${t('add')}</button>
       </form>
       <p class="form-error" id="games-error" hidden></p>
 
@@ -502,7 +500,7 @@ function renderGameList() {
           ${state.gameList.map((g) => {
             const played = timesPlayed(g.name);
             const max = Number(g.maxPlayers) || 0;
-            const options = ['<option value="">Alle</option>', '<option value="1">1 (Bonus)</option>']
+            const options = [`<option value="">${t('all')}</option>`, `<option value="1">${t('bonusOption')}</option>`]
               .concat(Array.from({ length: MAX_KIDS - 1 }, (_, i) => `<option value="${i + 2}">${i + 2}</option>`))
               .join('')
               .replace(`value="${max || ''}"`, `value="${max || ''}" selected`);
@@ -510,36 +508,33 @@ function renderGameList() {
               <li class="game-row ${g.active ? '' : 'off'}">
                 <div class="game-row-main">
                   ${g.id === renamingGameId
-                    ? `<input class="text-input rename-input" type="text" maxlength="40" value="${esc(g.name)}" data-id="${g.id}" autocomplete="off" aria-label="Neuer Name für ${esc(g.name)}">`
-                    : `<span class="game-row-name">${esc(g.name)}&nbsp;<button class="rename-btn" data-action="rename-game" data-id="${g.id}" title="Namen ändern" aria-label="${esc(g.name)} umbenennen">✏️</button>${isBonus(g) ? ' <span class="bonus-badge">⭐ Bonus</span>' : ''}${isTeam(g) ? ' <span class="team-badge">🔴🔵 Team</span>' : ''}</span>`}
-                  <span class="game-row-meta">${played ? (played === 1 ? 'Einmal gespielt' : `${played}-mal gespielt`) : 'Noch nicht gespielt'}${g.active ? `, ${chance[g.id]} % auf dem Glücksrad` : ''}</span>
+                    ? `<input class="text-input rename-input" type="text" maxlength="40" value="${esc(g.name)}" data-id="${g.id}" autocomplete="off" aria-label="${t('newNameFor', esc(g.name))}">`
+                    : `<span class="game-row-name">${esc(g.name)}&nbsp;<button class="rename-btn" data-action="rename-game" data-id="${g.id}" title="${t('rename')}" aria-label="${t('renameName', esc(g.name))}">✏️</button>${isBonus(g) ? ` <span class="bonus-badge">${t('bonusBadge')}</span>` : ''}${isTeam(g) ? ` <span class="team-badge">${t('teamBadge')}</span>` : ''}</span>`}
+                  <span class="game-row-meta">${t('playedTimes', played)}${g.active ? `, ${t('wheelChance', chance[g.id])}` : ''}</span>
                 </div>
                 <label class="players-select">
-                  <span>Spieler</span>
+                  <span>${t('players')}</span>
                   ${isTeam(g)
-                    ? '<span class="players-fixed" title="Teamspiele spielen alle Kinder zusammen">Alle</span>'
-                    : `<select class="game-max" data-id="${g.id}" aria-label="Wie viele Kinder spielen gleichzeitig ${esc(g.name)}?">${options}</select>`}
+                    ? `<span class="players-fixed" title="${t('teamAllPlay')}">${t('all')}</span>`
+                    : `<select class="game-max" data-id="${g.id}" aria-label="${t('howManyPlay', esc(g.name))}">${options}</select>`}
                 </label>
                 <button class="team-toggle ${isTeam(g) ? 'on' : ''}" data-action="toggle-team" data-id="${g.id}" aria-pressed="${isTeam(g)}"
-                  title="In zwei Teams spielen" aria-label="${esc(g.name)} als Teamspiel">
+                  title="${t('playInTeams')}" aria-label="${t('asTeamGame', esc(g.name))}">
                   <span class="team-toggle-dots" aria-hidden="true">🔴🔵</span>
-                  <span>Team</span>
+                  <span>${t('team')}</span>
                 </button>
                 <button class="switch ${g.active ? 'on' : ''}" role="switch" aria-checked="${g.active}" data-action="toggle-game" data-id="${g.id}"
-                  aria-label="${esc(g.name)} ${g.active ? 'ausschalten' : 'anschalten'}">
+                  aria-label="${g.active ? t('switchOff', esc(g.name)) : t('switchOn', esc(g.name))}">
                   <span class="switch-track"><span class="switch-knob"></span></span>
-                  <span class="switch-label">${g.active ? 'An' : 'Aus'}</span>
+                  <span class="switch-label">${g.active ? t('on') : t('off')}</span>
                 </button>
-                <button class="icon-btn" data-action="delete-list-game" data-id="${g.id}" title="Spiel löschen" aria-label="${esc(g.name)} löschen">🗑️</button>
+                <button class="icon-btn" data-action="delete-list-game" data-id="${g.id}" title="${t('deleteGame')}" aria-label="${t('deleteName', esc(g.name))}">🗑️</button>
               </li>`;
           }).join('')}
-        </ul>` : '<p class="muted">Noch keine Spiele. Füge oben ein Spiel hinzu.</p>'}
+        </ul>` : `<p class="muted">${t('noGamesYet')}</p>`}
 
       <div class="muted note">
-        <p><strong>Spieler:</strong> wie viele Kinder gleichzeitig spielen. Sind es mehr Kinder, wird in Gruppen gespielt, die gleich groß ausgelost werden. Jede Gruppe bekommt ihre eigenen Punkte.</p>
-        <p><strong>Team:</strong> Alle Kinder spielen zusammen, ausgelost in Team Rot und Team Blau. Das Gewinnerteam bekommt die Punkte für den 1. Platz, das andere Team die für den 2. Platz. Bei Unentschieden bekommen alle die Punkte für den 2. Platz.</p>
-        <p><strong>1 (Bonus):</strong> Nur das Kind, das dran ist, spielt. Geschafft gibt 1 Punkt, oder 2 Punkte, wenn es mehr als 3 Punkte hinter dem Vorletzten liegt.</p>
-        <p><strong>Glücksrad:</strong> Spiele, die aus sind, kommen nicht aufs Rad. Jedes Mal, wenn ein Spiel gespielt wurde, wird sein Feld halb so groß, bis alle Spiele einmal dran waren. Bonusspiele sind halb so oft dran, aber öfter, wenn das Kind, das dran ist, weit hinten liegt.</p>
+        ${t('gamesNotes').map((p) => `<p>${p}</p>`).join('')}
       </div>
     </section>`;
 }
@@ -553,7 +548,7 @@ function addGameToList() {
     return;
   }
   if (state.gameList.some((g) => g.name.toLowerCase() === name.toLowerCase())) {
-    errorEl.textContent = `„${name}“ ist schon in der Liste.`;
+    errorEl.textContent = t('alreadyInList', name);
     errorEl.hidden = false;
     input.focus();
     return;
@@ -593,7 +588,7 @@ function saveRenameGame() {
   if (!name || name === g.name) return cancelRenameGame();
   if (state.gameList.some((x) => x !== g && x.name.toLowerCase() === name.toLowerCase())) {
     const errorEl = document.getElementById('games-error');
-    errorEl.textContent = `„${name}“ ist schon in der Liste.`;
+    errorEl.textContent = t('alreadyInList', name);
     errorEl.hidden = false;
     input.focus();
     return;
@@ -619,7 +614,7 @@ function renderScores() {
   app.innerHTML = `
     <section class="screen fit scores-screen">
       <div class="board-panel">
-        <h1>Punktestand</h1>
+        <h1>${t('scoresTitle')}</h1>
         <ol class="board ${cols === 2 ? 'two-col' : ''}" style="--rows:${rows}">
           ${board.map((r) => {
             const medal = r.points > 0 && MEDALS[r.rank];
@@ -636,7 +631,7 @@ function renderScores() {
 
       <aside class="side-panel">
         ${nextStepButton()}
-        <h2>Gespielt <span class="muted">${state.games.length}</span></h2>
+        <h2>${t('played')} <span class="muted">${state.games.length}</span></h2>
         ${history.length ? `
           <ul class="history">
             ${history.map((g) => {
@@ -646,13 +641,13 @@ function renderScores() {
               if (g.bonus) {
                 const kidId = g.participants[0];
                 const pts = g.results[kidId] || 0;
-                meta = `<span>⭐ ${esc(kidById(kidId)?.name || '')} ${pts ? `geschafft +${pts}` : 'nicht geschafft'}</span>`;
-                link = `<a class="icon-btn" href="#/bonus/${g.id}" title="Ergebnis zeigen" aria-label="Ergebnis von ${esc(g.name)} zeigen">⭐</a>`;
+                meta = `<span>⭐ ${esc(kidById(kidId)?.name || '')} ${pts ? t('madeItPlus', pts) : t('notMadeIt')}</span>`;
+                link = `<a class="icon-btn" href="#/bonus/${g.id}" title="${t('showResult')}" aria-label="${t('showResultOf', esc(g.name))}">⭐</a>`;
               } else if (g.team && g.teams) {
                 meta = g.teamWinner === 'draw'
-                  ? '<span>🔴🔵 Unentschieden</span>'
-                  : `<span>${TEAMS[g.teamWinner].icon} ${TEAMS[g.teamWinner].name} gewinnt</span>`;
-                link = `<a class="icon-btn" href="#/team/${g.id}" title="Ergebnis zeigen" aria-label="Ergebnis von ${esc(g.name)} zeigen">🏆</a>`;
+                  ? `<span>🔴🔵 ${t('draw')}</span>`
+                  : `<span>${TEAMS[g.teamWinner].icon} ${t('teamWins', TEAMS[g.teamWinner].name)}</span>`;
+                link = `<a class="icon-btn" href="#/team/${g.id}" title="${t('showResult')}" aria-label="${t('showResultOf', esc(g.name))}">🏆</a>`;
               } else {
                 // One podium per group: show each group's winners (groups aren't compared).
                 const podium = groups.length > 1
@@ -660,9 +655,9 @@ function renderScores() {
                   : ranked(g.results, g.participants).filter((r) => r.points > 0).slice(0, 3);
                 meta = podium.length
                   ? podium.map((r) => `<span>${MEDALS[r.rank] || ''} ${esc(r.kid.name)} +${r.points}</span>`).join('')
-                  : `<span>${kidsLabel(g.participants.length)}, keine Punkte</span>`;
-                if (groups.length > 1) meta = `<span>${groups.length} Gruppen</span>${meta}`;
-                if (podium.length) link = `<a class="icon-btn" href="#/podium/${g.id}/1" title="Siegertreppchen zeigen" aria-label="Siegertreppchen für ${esc(g.name)} zeigen">🏆</a>`;
+                  : `<span>${t('noPoints', kidsLabel(g.participants.length))}</span>`;
+                if (groups.length > 1) meta = `<span>${t('groupsN', groups.length)}</span>${meta}`;
+                if (podium.length) link = `<a class="icon-btn" href="#/podium/${g.id}/1" title="${t('showPodium')}" aria-label="${t('showPodiumFor', esc(g.name))}">🏆</a>`;
               }
               return `
                 <li class="history-row">
@@ -672,11 +667,11 @@ function renderScores() {
                   </div>
                   <div class="history-actions">
                     ${link}
-                    <button class="icon-btn" data-action="delete-game" data-id="${g.id}" title="Spiel löschen" aria-label="${esc(g.name)} löschen">🗑️</button>
+                    <button class="icon-btn" data-action="delete-game" data-id="${g.id}" title="${t('deleteGame')}" aria-label="${t('deleteName', esc(g.name))}">🗑️</button>
                   </div>
                 </li>`;
             }).join('')}
-          </ul>` : '<p class="muted">Fertige Spiele stehen dann hier.</p>'}
+          </ul>` : `<p class="muted">${t('historyEmpty')}</p>`}
       </aside>
     </section>`;
 }
@@ -687,11 +682,12 @@ function renderGame() {
   else renderNewGame();
 }
 
-// "Mia sucht das Spiel aus" under the title of the game-picking screens.
-function pickerLine() {
+// "Mia sucht das Spiel aus" under the title of the game-picking screens
+// (`textKey` is 'picksGame' or, on the wheel, 'pressesStop').
+function pickerLine(textKey = 'picksGame') {
   const kid = turnKid();
   return kid
-    ? `<p class="picker-line" style="${kidStyle(kid)}"><span class="picker-avatar">${kid.avatar}</span><span><strong>${esc(kid.name)}</strong> sucht das Spiel aus</span></p>`
+    ? `<p class="picker-line" style="${kidStyle(kid)}"><span class="picker-avatar">${kid.avatar}</span><span>${t(textKey, esc(kid.name))}</span></p>`
     : '';
 }
 
@@ -711,46 +707,46 @@ function renderNewGame() {
   if (draft.gameId && !choices.some((g) => g.id === draft.gameId)) draft.gameId = null;
   const chosen = draft.gameId && gameById(draft.gameId);
   const preview = !chosen || isBonus(chosen) ? ''
-    : isTeam(chosen) ? '🔴🔵 Teamspiel: Die Kinder werden in Team Rot und Team Blau ausgelost.'
+    : isTeam(chosen) ? t('teamPreview')
     : groupPreview(draft.participants.length, Number(chosen.maxPlayers) || 0);
 
   app.innerHTML = `
     <section class="screen">
       <div class="game-head">
         <div>
-          <h1 class="game-name">Neues Spiel</h1>
+          <h1 class="game-name">${t('newGame')}</h1>
           ${pickerLine()}
         </div>
         <div class="head-actions">
           <p class="form-error" id="game-error" hidden></p>
-          <button class="btn big" data-action="start-game">Spiel starten</button>
+          <button class="btn big" data-action="start-game">${t('startGame')}</button>
         </div>
       </div>
 
       <div class="name-card">
         <div class="pick-head">
-          <h2>Was spielen wir?</h2>
-          ${choices.length ? '<button class="btn primary random-btn" data-default data-action="go-wheel">🎲 Zufall</button>' : ''}
+          <h2>${t('whatToPlay')}</h2>
+          ${choices.length ? `<button class="btn primary random-btn" data-default data-action="go-wheel">${t('random')}</button>` : ''}
         </div>
         ${choices.length ? `
           <div class="game-tiles">
             ${choices.map((g) => `
               <button class="game-tile ${g.id === draft.gameId ? 'on' : ''}" data-action="pick-game" data-id="${g.id}" aria-pressed="${g.id === draft.gameId}">
                 <span class="game-tile-name">${esc(g.name)}</span>
-                ${isBonus(g) ? '<span class="bonus-badge">⭐ Bonusspiel</span>' : ''}
-                ${timesPlayed(g.name) ? '<span class="game-tile-meta">Schon gespielt</span>' : ''}
+                ${isBonus(g) ? `<span class="bonus-badge">${t('bonusGame')}</span>` : ''}
+                ${timesPlayed(g.name) ? `<span class="game-tile-meta">${t('playedBefore')}</span>` : ''}
               </button>`).join('')}
           </div>` : `
-          <p class="muted">Gerade ist kein Spiel an.</p>
-          <a class="btn" href="#/games">Spiele anschalten</a>`}
+          <p class="muted">${t('noGamesOn')}</p>
+          <a class="btn" href="#/games">${t('switchGamesOn')}</a>`}
       </div>
 
       ${chosen && isBonus(chosen) ? bonusNote() : `
       <div class="section-head">
-        <h2>Wer spielt mit? <span class="muted">${draft.participants.length} von ${state.kids.length}</span></h2>
+        <h2>${t('whoPlays')} <span class="muted">${t('xOfY', draft.participants.length, state.kids.length)}</span></h2>
         <div class="section-tools">
-          <button class="btn small-btn" data-action="select-all">Alle</button>
-          <button class="btn small-btn" data-action="select-none">Keiner</button>
+          <button class="btn small-btn" data-action="select-all">${t('all')}</button>
+          <button class="btn small-btn" data-action="select-none">${t('none')}</button>
         </div>
       </div>
       ${preview ? `<p class="group-preview">${preview}</p>` : ''}
@@ -772,8 +768,8 @@ function bonusNote() {
   const pts = bonusPoints(kid.id);
   return `
     <div class="bonus-note" style="${kidStyle(kid)}">
-      <span class="bonus-badge big">⭐ Bonusspiel: ein Sonderpreis!</span>
-      <p>Nur <strong>${esc(kid.name)}</strong> spielt. Geschafft gibt ${pointsText(pts)}${pts === 2 ? ', weil du gerade weit hinten liegst' : ''}. Nicht geschafft gibt 0 Punkte.</p>
+      <span class="bonus-badge big">${t('bonusPrize')}</span>
+      <p>${t('bonusNote', esc(kid.name), pointsText(pts), pts === 2)}</p>
     </div>`;
 }
 
@@ -792,9 +788,9 @@ function renderWheel() {
   if (!slices.length) {
     app.innerHTML = `
       <section class="screen">
-        <h1>Glücksrad</h1>
-        <p class="muted">Gerade ist kein Spiel an.</p>
-        <a class="btn" href="#/games">Spiele anschalten</a>
+        <h1>${t('wheel')}</h1>
+        <p class="muted">${t('noGamesOn')}</p>
+        <a class="btn" href="#/games">${t('switchGamesOn')}</a>
       </section>`;
     return;
   }
@@ -825,12 +821,12 @@ function renderWheel() {
   app.innerHTML = `
     <section class="screen fit wheel-screen">
       <div class="wheel-head">
-        <h1>Glücksrad</h1>
-        ${pickerLine().replace('sucht das Spiel aus', 'drückt auf Stopp')}
+        <h1>${t('wheel')}</h1>
+        ${pickerLine('pressesStop')}
       </div>
       <div class="wheel-stage">
         <div class="wheel-wrap">
-          <svg class="wheel" viewBox="-115 -120 230 235" role="img" aria-label="Glücksrad mit ${n} Spielen">
+          <svg class="wheel" viewBox="-115 -120 230 235" role="img" aria-label="${t('wheelLabel', n)}">
             <g id="wheel-rotor">${sliceSvg}</g>
             <circle r="${R}" fill="none" class="wheel-rim"/>
             <circle r="11" class="wheel-hub"/>
@@ -838,17 +834,17 @@ function renderWheel() {
           </svg>
         </div>
         <div class="wheel-side">
-          <p class="wheel-status" id="wheel-status" aria-live="polite">Das Rad dreht sich …</p>
-          <button class="btn primary stop-btn" id="wheel-stop" data-action="wheel-stop" disabled>Stopp!</button>
-          <p class="wheel-key-hint" id="wheel-key-hint">oder Leertaste drücken</p>
+          <p class="wheel-status" id="wheel-status" aria-live="polite">${t('wheelSpinning')}</p>
+          <button class="btn primary stop-btn" id="wheel-stop" data-action="wheel-stop" disabled>${t('stop')}</button>
+          <p class="wheel-key-hint" id="wheel-key-hint">${t('orSpace')}</p>
           <div class="wheel-result" id="wheel-result" hidden>
-            <span class="wheel-result-label">Als Nächstes spielen wir</span>
+            <span class="wheel-result-label">${t('nextWePlay')}</span>
             <span class="wheel-result-name" id="wheel-result-name"></span>
-            <span class="bonus-badge big" id="wheel-bonus" hidden>⭐ Bonusspiel: ein Sonderpreis!</span>
+            <span class="bonus-badge big" id="wheel-bonus" hidden>${t('bonusPrize')}</span>
             <span class="wheel-result-note" id="wheel-note"></span>
             <div class="wheel-result-actions">
-              <button class="btn primary big" data-default data-action="wheel-start-all">Mit allen Kindern starten</button>
-              <button class="btn big" data-action="wheel-choose-kids">Kinder auswählen</button>
+              <button class="btn primary big" data-default data-action="wheel-start-all">${t('startWithAll')}</button>
+              <button class="btn big" data-action="wheel-choose-kids">${t('chooseKids')}</button>
             </div>
           </div>
         </div>
@@ -893,7 +889,7 @@ function startWheel(slices) {
         const stopBtn = document.getElementById('wheel-stop');
         stopBtn.disabled = false;
         stopBtn.focus();
-        document.getElementById('wheel-status').textContent = 'Drück auf Stopp!';
+        document.getElementById('wheel-status').textContent = t('pressStop');
       }
     }
     if (wheel.phase === 'stopping') {
@@ -930,7 +926,7 @@ function pressWheelStop() {
   wheel.friction = 1.6 + Math.random() * 0.6;
   const stopBtn = document.getElementById('wheel-stop');
   stopBtn.disabled = true;
-  document.getElementById('wheel-status').textContent = 'Gleich bleibt es stehen …';
+  document.getElementById('wheel-status').textContent = t('almostStopped');
 }
 
 function finishWheel() {
@@ -954,12 +950,12 @@ function finishWheel() {
     const kid = turnKid();
     const pts = bonusPoints(kid.id);
     document.getElementById('wheel-bonus').hidden = false;
-    note.textContent = `Nur ${kid.name} spielt. Geschafft gibt ${pointsText(pts)}.`;
-    document.querySelector('[data-action="wheel-start-all"]').textContent = 'Bonusspiel starten';
+    note.textContent = t('onlyPlays', kid.name, pointsText(pts));
+    document.querySelector('[data-action="wheel-start-all"]').textContent = t('startBonus');
     document.querySelector('[data-action="wheel-choose-kids"]').hidden = true;
   } else {
     note.textContent = isTeam(game)
-      ? '🔴🔵 Teamspiel: Rot gegen Blau'
+      ? t('teamRedVsBlue')
       : groupPreview(state.kids.length, Number(game.maxPlayers) || 0);
   }
   document.getElementById('wheel-result').hidden = false;
@@ -981,10 +977,10 @@ function renderGameInProgress() {
   const index = g.groupIndex || 0;
   const multi = groups.length > 1;
   const strip = multi ? `
-    <ol class="group-strip" aria-label="Gruppen">
+    <ol class="group-strip" aria-label="${t('groups')}">
       ${groups.map((grp, i) => `
         <li class="group-chip ${i < index ? 'done' : i === index ? 'now' : ''}">
-          <span class="group-label">Gruppe ${i + 1}${i < index ? ' ✓' : ''}</span>
+          <span class="group-label">${t('groupN', i + 1)}${i < index ? ' ✓' : ''}</span>
           <span class="group-avatars">${grp.map((id) => kidById(id)?.avatar || '').join('')}</span>
         </li>`).join('')}
     </ol>` : '';
@@ -994,11 +990,11 @@ function renderGameInProgress() {
       <div class="game-head">
         <div>
           <h1 class="game-name">${esc(g.name)}</h1>
-          <p class="hint">${multi ? `<strong>Gruppe ${index + 1} von ${groups.length}:</strong> ${joinNames(g.participants)} ${g.participants.length === 1 ? 'spielt' : 'spielen'}. ` : ''}Tippe auf eine Medaille oder auf − und +.</p>
+          <p class="hint">${multi ? t('groupHint', index + 1, groups.length, joinNames(g.participants), g.participants.length) : ''}${t('medalHint')}</p>
         </div>
         <div class="head-actions">
-          <button class="btn" data-action="cancel-game">Abbrechen</button>
-          <button class="btn primary big" data-default data-action="finish-game">${multi && index < groups.length - 1 ? 'Gruppe fertig' : 'Spiel fertig'}</button>
+          <button class="btn" data-action="cancel-game">${t('cancel')}</button>
+          <button class="btn primary big" data-default data-action="finish-game">${multi && index < groups.length - 1 ? t('groupDone') : t('gameDone')}</button>
         </div>
       </div>
       ${strip}
@@ -1019,11 +1015,11 @@ function renderGameInProgress() {
                 <div class="medal-row">
                   ${[1, 2, 3].map((p) => `
                     <button class="medal-btn ${medal === p ? 'on' : ''}" data-action="medal" data-id="${id}" data-place="${p}"
-                      title="${place(p)} Platz: ${pointsText(state.points[p])}" aria-label="${place(p)} Platz für ${esc(k.name)}">${MEDALS[p]}</button>`).join('')}
+                      title="${t('placeN', p)}: ${pointsText(state.points[p])}" aria-label="${t('placeFor', t('placeN', p), esc(k.name))}">${MEDALS[p]}</button>`).join('')}
                 </div>
                 <div class="adjust-row">
-                  <button class="round-btn" data-action="adjust" data-id="${id}" data-delta="-1" ${pts <= 0 ? 'disabled' : ''} aria-label="${esc(k.name)} einen Punkt wegnehmen">−</button>
-                  <button class="round-btn" data-action="adjust" data-id="${id}" data-delta="1" aria-label="${esc(k.name)} einen Punkt geben">+</button>
+                  <button class="round-btn" data-action="adjust" data-id="${id}" data-delta="-1" ${pts <= 0 ? 'disabled' : ''} aria-label="${t('takePoint', esc(k.name))}">−</button>
+                  <button class="round-btn" data-action="adjust" data-id="${id}" data-delta="1" aria-label="${t('givePoint', esc(k.name))}">+</button>
                 </div>
               </div>
             </div>`;
@@ -1045,20 +1041,18 @@ function renderBonusInProgress() {
   const pts = bonusPoints(kid.id);
   app.innerHTML = `
     <section class="screen fit round-screen">
-      <span class="bonus-badge big">⭐ Bonusspiel</span>
+      <span class="bonus-badge big">${t('bonusGame')}</span>
       <div class="round-number">${esc(g.name)}</div>
       <div class="round-kid" style="${kidStyle(kid)}">
         <span class="round-avatar">${kid.avatar}</span>
         <span class="round-name">${esc(kid.name)}</span>
       </div>
-      <p class="round-text">${pts === 2
-        ? 'Wenn du es schaffst, bekommst du 2 Punkte, weil du gerade weit hinten liegst!'
-        : 'Wenn du es schaffst, bekommst du 1 Punkt.'}</p>
+      <p class="round-text">${pts === 2 ? t('bonusIfTwo') : t('bonusIfOne')}</p>
       <div class="round-actions">
-        <button class="btn primary huge" data-default data-action="bonus-result" data-ok="1">Geschafft!</button>
-        <button class="btn huge" data-action="bonus-result" data-ok="0">Nicht geschafft</button>
+        <button class="btn primary huge" data-default data-action="bonus-result" data-ok="1">${t('madeIt')}</button>
+        <button class="btn huge" data-action="bonus-result" data-ok="0">${t('didntMakeIt')}</button>
       </div>
-      <button class="btn small-btn skip-btn" data-action="cancel-game">Abbrechen</button>
+      <button class="btn small-btn skip-btn" data-action="cancel-game">${t('cancel')}</button>
     </section>`;
 }
 
@@ -1072,7 +1066,7 @@ function teamPanels(teams, { results = null, winner = null } = {}) {
       <div class="team-panel team-${team} ${won ? 'won' : ''} ${winner && winner !== 'draw' && !won ? 'lost' : ''}" style="--team:${t.color}">
         <div class="team-head">
           <span class="team-name">${t.icon} ${t.name}</span>
-          ${won ? '<span class="team-crown">👑 Sieger</span>' : ''}
+          ${won ? `<span class="team-crown">${t('winnerCrown')}</span>` : ''}
         </div>
         <ul class="team-kids">
           ${teams[team].filter((id) => kidById(id)).map((id) => {
@@ -1087,7 +1081,7 @@ function teamPanels(teams, { results = null, winner = null } = {}) {
         </ul>
       </div>`;
   };
-  return `<div class="team-split">${panel('red')}<div class="team-vs">gegen</div>${panel('blue')}</div>`;
+  return `<div class="team-split">${panel('red')}<div class="team-vs">${t('versus')}</div>${panel('blue')}</div>`;
 }
 
 // A team game in progress: the teams, and who won. No default button on purpose:
@@ -1100,18 +1094,18 @@ function renderTeamInProgress() {
       <div class="game-head">
         <div>
           <h1 class="game-name">${esc(g.name)}</h1>
-          <p class="hint">Teamspiel: Rot gegen Blau. Wer hat gewonnen?</p>
+          <p class="hint">${t('teamHint')}</p>
         </div>
         <div class="head-actions">
-          <button class="btn" data-action="cancel-game">Abbrechen</button>
-          <button class="btn" data-action="team-shuffle">🔀 Neu mischen</button>
+          <button class="btn" data-action="cancel-game">${t('cancel')}</button>
+          <button class="btn" data-action="team-shuffle">${t('shuffle')}</button>
         </div>
       </div>
       ${teamPanels(g.teams)}
       <div class="actions center team-actions">
-        <button class="btn huge team-btn" style="--team:${TEAMS.red.color}" data-action="team-win" data-team="red">${TEAMS.red.icon} Team Rot gewinnt</button>
-        <button class="btn huge" data-action="team-win" data-team="draw">Unentschieden</button>
-        <button class="btn huge team-btn" style="--team:${TEAMS.blue.color}" data-action="team-win" data-team="blue">${TEAMS.blue.icon} Team Blau gewinnt</button>
+        <button class="btn huge team-btn" style="--team:${TEAMS.red.color}" data-action="team-win" data-team="red">${TEAMS.red.icon} ${t('teamWins', TEAMS.red.name)}</button>
+        <button class="btn huge" data-action="team-win" data-team="draw">${t('draw')}</button>
+        <button class="btn huge team-btn" style="--team:${TEAMS.blue.color}" data-action="team-win" data-team="blue">${TEAMS.blue.icon} ${t('teamWins', TEAMS.blue.name)}</button>
       </div>
     </section>`;
 }
@@ -1128,7 +1122,7 @@ function renderTeamResult(gameId) {
     <section class="screen fit">
       <div class="team-result-head">
         <h1>${esc(game.name)}</h1>
-        <p class="team-outcome">${winner === 'draw' ? 'Unentschieden!' : `${TEAMS[winner].icon} ${TEAMS[winner].name} hat gewonnen!`}</p>
+        <p class="team-outcome">${winner === 'draw' ? t('drawExcl') : `${TEAMS[winner].icon} ${t('teamWon', TEAMS[winner].name)}`}</p>
       </div>
       ${teamPanels(game.teams, { results: game.results, winner })}
       <div class="actions center">${resultButtons()}</div>
@@ -1149,17 +1143,17 @@ function startGame() {
   const errorEl = document.getElementById('game-error');
   const game = draft.gameId && gameById(draft.gameId);
   if (!game) {
-    errorEl.textContent = 'Such zuerst ein Spiel aus.';
+    errorEl.textContent = t('pickGameFirst');
     errorEl.hidden = false;
     return;
   }
   if (!isBonus(game) && !draft.participants.length) {
-    errorEl.textContent = 'Wähle mindestens ein Kind aus.';
+    errorEl.textContent = t('pickOneKid');
     errorEl.hidden = false;
     return;
   }
   if (isTeam(game) && draft.participants.length < 2) {
-    errorEl.textContent = 'Für ein Teamspiel braucht ihr mindestens 2 Kinder.';
+    errorEl.textContent = t('teamNeedsTwo');
     errorEl.hidden = false;
     return;
   }
@@ -1200,7 +1194,7 @@ function finishGame() {
   if (!g.groups) Object.assign(g, { groups: [g.participants], groupIndex: 0, done: [] }); // started before groups existed
   const awarded = g.participants.some((id) => g.results[id] > 0);
   const moreGroups = g.groupIndex < g.groups.length - 1;
-  if (!g.bonus && !g.team && !awarded && !confirm(`In ${moreGroups ? 'dieser Gruppe' : 'diesem Spiel'} hat niemand Punkte bekommen. Trotzdem weiter?`)) return;
+  if (!g.bonus && !g.team && !awarded && !confirm(t('confirmNoPoints', moreGroups))) return;
   g.done.push({ participants: g.participants, results: g.results, medals: g.medals });
 
   // More groups to go: show this group's podium, then the next group plays.
@@ -1266,32 +1260,32 @@ function renderRound() {
     return `
       <li class="turn-kid ${status}" style="${kidStyle(k)}" title="${esc(k.name)}">
         <span class="turn-avatar">${k.avatar}</span>
-        ${status === 'done' ? '<span class="turn-check" aria-label="war schon dran">✓</span>' : ''}
+        ${status === 'done' ? `<span class="turn-check" aria-label="${t('hadTurn')}">✓</span>` : ''}
       </li>`;
   }).join('');
 
   app.innerHTML = kid ? `
     <section class="screen fit round-screen">
-      <div class="round-number">Runde ${state.round.number}</div>
+      <div class="round-number">${t('roundN', state.round.number)}</div>
       <div class="round-kid" style="${kidStyle(kid)}">
         <span class="round-avatar">${kid.avatar}</span>
         <span class="round-name">${esc(kid.name)}</span>
       </div>
-      <p class="round-text">Du darfst das nächste Spiel aussuchen!</p>
+      <p class="round-text">${t('youPick')}</p>
       <div class="round-actions">
-        <button class="btn huge" data-action="go-game">Spiel aussuchen</button>
-        <button class="btn primary random-btn huge" data-default data-action="go-wheel">🎲 Zufall</button>
+        <button class="btn huge" data-action="go-game">${t('pickGame')}</button>
+        <button class="btn primary random-btn huge" data-default data-action="go-wheel">${t('random')}</button>
       </div>
-      <ol class="turn-order" aria-label="Reihenfolge">${order}</ol>
-      <button class="btn small-btn skip-btn" data-action="round-skip">Überspringen</button>
+      <ol class="turn-order" aria-label="${t('order')}">${order}</ol>
+      <button class="btn small-btn skip-btn" data-action="round-skip">${t('skip')}</button>
     </section>` : `
     <section class="screen fit round-screen">
-      <div class="round-number">Alle waren dran!</div>
-      <ol class="turn-order big" aria-label="Reihenfolge">${order}</ol>
-      <p class="round-text">Spielen wir noch eine Runde für alle, oder ist die Party vorbei?</p>
+      <div class="round-number">${t('everyoneHadTurn')}</div>
+      <ol class="turn-order big" aria-label="${t('order')}">${order}</ol>
+      <p class="round-text">${t('anotherRoundQ')}</p>
       <div class="round-actions">
-        <button class="btn primary huge" data-default data-action="round-continue">Noch eine Runde für alle</button>
-        <button class="btn huge" data-action="party-finish">Party beenden</button>
+        <button class="btn primary huge" data-default data-action="round-continue">${t('anotherRound')}</button>
+        <button class="btn huge" data-action="party-finish">${t('endParty')}</button>
       </div>
     </section>`;
   app.querySelector('[data-default]')?.focus();
@@ -1311,8 +1305,8 @@ function renderGamePodium(gameId, groupNo) {
       return;
     }
     renderPodium(g.name, ranked(grp.results, grp.participants), `
-      <button class="btn primary big" data-default data-action="go-game">Nächste Gruppe</button>`,
-      `<p class="podium-sub">Gruppe ${n} von ${g.groups.length}. Als Nächstes: ${joinNames(g.participants)}</p>`);
+      <button class="btn primary big" data-default data-action="go-game">${t('nextGroup')}</button>`,
+      `<p class="podium-sub">${t('groupNext', n, g.groups.length, joinNames(g.participants))}</p>`);
     return;
   }
 
@@ -1329,8 +1323,8 @@ function renderGamePodium(gameId, groupNo) {
   const n = Math.min(groups.length, Math.max(1, Number(groupNo) || groups.length));
   const grp = groups[n - 1];
   const tabs = groups.length > 1 ? `
-    <nav class="group-tabs" aria-label="Gruppen">
-      ${groups.map((_, i) => `<a class="group-tab ${i + 1 === n ? 'on' : ''}" href="#/podium/${game.id}/${i + 1}">Gruppe ${i + 1}</a>`).join('')}
+    <nav class="group-tabs" aria-label="${t('groups')}">
+      ${groups.map((_, i) => `<a class="group-tab ${i + 1 === n ? 'on' : ''}" href="#/podium/${game.id}/${i + 1}">${t('groupN', i + 1)}</a>`).join('')}
     </nav>` : '';
   renderPodium(game.name, ranked(grp.results, grp.participants), `
     ${resultButtons()}`, tabs);
@@ -1347,13 +1341,13 @@ function renderBonusResult(gameId) {
   const pts = game.results[kid.id] || 0;
   app.innerHTML = `
     <section class="screen fit round-screen">
-      <span class="bonus-badge big">⭐ Bonusspiel</span>
+      <span class="bonus-badge big">${t('bonusGame')}</span>
       <div class="round-number">${esc(game.name)}</div>
       <div class="round-kid" style="${kidStyle(kid)}">
         <span class="round-avatar">${kid.avatar}</span>
         <span class="round-name">${esc(kid.name)}</span>
       </div>
-      <p class="bonus-outcome ${pts ? 'won' : ''}">${pts ? `Geschafft! +${pointsText(pts)}` : 'Leider nicht geschafft.'}</p>
+      <p class="bonus-outcome ${pts ? 'won' : ''}">${pts ? t('madeItPts', pointsText(pts)) : t('notMadeItSorry')}</p>
       <div class="round-actions">
         ${resultButtons('huge')}
       </div>
@@ -1372,10 +1366,10 @@ function renderFinal() {
     location.replace('#/' + playPath());
     return;
   }
-  renderPodium('Endstand', ranked(totals(), state.kids.map((k) => k.id)), `
-    <button class="btn big" data-action="party-resume">Weiterspielen</button>
-    <button class="btn primary big" data-default data-action="go-scores">Zum Punktestand</button>
-    <button class="btn big danger" data-action="reset">Neue Party starten</button>`);
+  renderPodium(t('finalTitle'), ranked(totals(), state.kids.map((k) => k.id)), `
+    <button class="btn big" data-action="party-resume">${t('keepPlaying')}</button>
+    <button class="btn primary big" data-default data-action="go-scores">${t('toScores')}</button>
+    <button class="btn big danger" data-action="reset">${t('newParty')}</button>`);
 }
 
 // Kids with points who rank 1st–3rd stand on the podium (ties share a step);
@@ -1394,7 +1388,7 @@ function renderPodium(title, results, buttonsHtml, subtitleHtml = '') {
     <div class="podium-kid" style="${kidStyle(r.kid)}">
       <span class="podium-avatar">${r.kid.avatar}</span>
       <span class="podium-name">${esc(r.kid.name)}</span>
-      <span class="podium-points">${onGround ? place(r.rank) + ' Platz' : pointsText(r.points)}</span>
+      <span class="podium-points">${onGround ? t('placeN', r.rank) : pointsText(r.points)}</span>
     </div>`;
   const stepHtml = (p) => `
     <div class="step step-${p}">
@@ -1432,9 +1426,9 @@ function showWinnerPop(winners, onDone) {
   pop.setAttribute('role', 'status');
   pop.innerHTML = `
     <div class="winner-pop-text">
-      <span class="winner-label">Sieger</span>
+      <span class="winner-label">${t('winner', winners.length)}</span>
       <span class="winner-names">
-        ${winners.map((k) => `<span class="winner-name" style="${kidStyle(k)}">${esc(k.name)}</span>`).join('<span class="winner-and">und</span>')}
+        ${winners.map((k) => `<span class="winner-name" style="${kidStyle(k)}">${esc(k.name)}</span>`).join(`<span class="winner-and">${t('and')}</span>`)}
       </span>
     </div>`;
 
@@ -1509,8 +1503,8 @@ function showIntro() {
     <div class="intro-center">
       <div class="intro-cake" aria-hidden="true">🎂</div>
       <h1 class="intro-title"><span class="intro-word w1">Birthday</span> <span class="intro-word w2">Battle</span></h1>
-      <p class="intro-tagline">Die große Spiele-Party!</p>
-      <p class="intro-start">Drück irgendwo zum Starten</p>
+      <p class="intro-tagline">${t('tagline')}</p>
+      <p class="intro-start">${t('pressToStart')}</p>
     </div>
     <div class="intro-flash"></div>`;
   el.addEventListener('click', advanceIntro);
@@ -1559,20 +1553,83 @@ document.getElementById('brand').addEventListener('click', (e) => {
   showIntro();
 });
 
-// ---------- Sound toggle ----------
-const soundToggle = document.getElementById('sound-toggle');
-function renderSoundToggle() {
-  soundToggle.textContent = Sound.enabled ? '🔊' : '🔇';
-  soundToggle.title = Sound.enabled ? 'Ton ausschalten' : 'Ton anschalten';
-  soundToggle.setAttribute('aria-label', soundToggle.title);
-  soundToggle.setAttribute('aria-pressed', String(!Sound.enabled));
+// ---------- Settings menu (⚙️): sound on/off and language ----------
+const settingsBtn = document.getElementById('settings-btn');
+const brandBtn = document.getElementById('brand');
+
+// Text in the static page shell (the rest is re-rendered with the screens).
+function renderShell() {
+  settingsBtn.title = t('settings');
+  settingsBtn.setAttribute('aria-label', t('settings'));
+  brandBtn.title = t('playIntro');
 }
-soundToggle.addEventListener('click', () => {
-  Sound.toggle();
-  renderSoundToggle();
-  soundToggle.blur(); // keep the space bar for the screen's default button
+
+function openSettings() {
+  if (document.querySelector('.settings-overlay')) return;
+  const overlay = document.createElement('div');
+  overlay.className = 'overlay settings-overlay';
+
+  const draw = () => {
+    overlay.innerHTML = `
+      <div class="modal settings-modal" role="dialog" aria-modal="true" aria-labelledby="settings-title">
+        <h2 id="settings-title">⚙️ ${t('settings')}</h2>
+        <div class="setting-row">
+          <span class="setting-label">${Sound.enabled ? '🔊' : '🔇'} ${t('sound')}</span>
+          <button class="switch ${Sound.enabled ? 'on' : ''}" role="switch" aria-checked="${Sound.enabled}" data-setting="sound" aria-label="${t('sound')}">
+            <span class="switch-track"><span class="switch-knob"></span></span>
+            <span class="switch-label">${Sound.enabled ? t('on') : t('off')}</span>
+          </button>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">💬 ${t('language')}</span>
+          <div class="lang-choice" role="radiogroup" aria-label="${t('language')}">
+            ${Object.entries(LANGUAGES).map(([code, name]) => `
+              <button class="lang-btn ${code === lang ? 'on' : ''}" role="radio" aria-checked="${code === lang}" data-lang="${code}" lang="${code}">${name}</button>`).join('')}
+          </div>
+        </div>
+        <button class="btn primary" data-close>${t('close')}</button>
+      </div>`;
+  };
+
+  const close = () => {
+    overlay.remove();
+    document.removeEventListener('keydown', onKey);
+    settingsBtn.focus();
+  };
+  const onKey = (e) => { if (e.key === 'Escape') close(); };
+
+  overlay.addEventListener('click', (e) => {
+    const langBtn = e.target.closest('[data-lang]');
+    if (e.target.closest('[data-setting="sound"]')) {
+      if (Sound.enabled) Sound.click(); // the last click before going quiet
+      Sound.toggle();
+      draw();
+      overlay.querySelector('[data-setting="sound"]').focus();
+    } else if (langBtn) {
+      Sound.click();
+      if (langBtn.dataset.lang !== lang) {
+        setLanguage(langBtn.dataset.lang);
+        renderShell();
+        render(); // the screen behind the menu switches language right away
+      }
+      draw();
+      overlay.querySelector(`[data-lang="${lang}"]`).focus();
+    } else if (e.target === overlay || e.target.closest('[data-close]')) {
+      Sound.click();
+      close();
+    }
+  });
+  document.addEventListener('keydown', onKey);
+  draw();
+  document.body.appendChild(overlay);
+  overlay.querySelector('[data-setting="sound"]').focus();
+}
+
+settingsBtn.addEventListener('click', () => {
+  Sound.click();
+  openSettings();
 });
-renderSoundToggle();
+renderShell();
 
 // Buttons with a sound of their own (instead of the normal click).
 const OWN_SOUND_ACTIONS = new Set(['wheel-stop', 'team-shuffle']);
@@ -1600,8 +1657,8 @@ document.addEventListener('click', (e) => {
     case 'count-dec': {
       const last = state.kids[state.kids.length - 1];
       if (state.kids.length <= MIN_KIDS) break;
-      const label = last.name.trim() || 'das letzte Kind';
-      if (kidHasPoints(last.id) && !confirm(`${label} entfernen? Die Punkte gehen dann verloren.`)) break;
+      const label = last.name.trim() || t('theLastKid');
+      if (kidHasPoints(last.id) && !confirm(t('confirmRemoveKid', label))) break;
       state.kids.pop();
       saveState();
       renderSetup();
@@ -1614,7 +1671,7 @@ document.addEventListener('click', (e) => {
       finishSetup();
       break;
     case 'reset':
-      if (confirm('Neue Party starten? Alle Kinder, Spiele und Punkte werden gelöscht. Die Spieleliste bleibt.')) {
+      if (confirm(t('confirmReset'))) {
         // Keep the game list and points, but start the wheel's round counts from 0.
         state = { ...defaultState(), gameList: state.gameList.map((g) => ({ ...g, played: 0 })), points: state.points };
         draft = null;
@@ -1640,7 +1697,7 @@ document.addEventListener('click', (e) => {
       break;
     case 'delete-list-game': {
       const g = gameById(id);
-      if (g && confirm(`„${g.name}“ aus der Liste löschen?`)) {
+      if (g && confirm(t('confirmDeleteListGame', g.name))) {
         state.gameList = state.gameList.filter((x) => x.id !== id);
         normalizeRounds();
         saveState();
@@ -1669,7 +1726,7 @@ document.addEventListener('click', (e) => {
     // Rounds
     case 'round-skip': {
       const kid = turnKid();
-      if (kid && confirm(`${kid.name} überspringen? Dann ist das nächste Kind dran.`)) {
+      if (kid && confirm(t('confirmSkip', kid.name))) {
         state.round.turn++;
         saveState();
         renderRound();
@@ -1712,7 +1769,7 @@ document.addEventListener('click', (e) => {
     }
     case 'delete-game': {
       const g = state.games.find((x) => x.id === id);
-      if (g && confirm(`„${g.name}“ und die Punkte davon löschen?`)) {
+      if (g && confirm(t('confirmDeleteGame', g.name))) {
         state.games = state.games.filter((x) => x.id !== id);
         saveState();
         renderScores();
@@ -1809,7 +1866,7 @@ document.addEventListener('click', (e) => {
       break;
     }
     case 'cancel-game':
-      if (confirm(`„${state.current.name}“ abbrechen? Die Punkte aus diesem Spiel werden nicht gespeichert.`)) {
+      if (confirm(t('confirmCancelGame', state.current.name))) {
         state.current = null;
         saveState();
         go('round'); // the same kid picks again
