@@ -29,6 +29,7 @@ const WHEEL_COLORS = ['#FF5D8F', '#3EC1F3', '#7BE07B', '#FF9F43', '#B583FF', '#2
 const WHEEL_SLOW_MS = 2000;     // slow spin before it speeds up (the Stopp button is locked meanwhile)
 const WHEEL_SLOW_SPEED = 45;    // degrees per second
 const WHEEL_RAMP_MS = 600;      // time to speed up to full speed
+const TIMER_STEPS = Array.from({ length: 11 }, (_, i) => i * 30); // game timer: none, 0:30 … 5:00 (seconds)
 
 const app = document.getElementById('app');
 const nav = document.getElementById('nav');
@@ -98,6 +99,7 @@ const ptsLabel = (n) => t('ptsWord', n);
 const pointsText = (n) => `${n} ${ptsLabel(n)}`;
 const place = (n) => t('rank', n); // "1." in German, "1st" in English
 const kidStyle = (kid) => `--kid:${esc(kid.color)}`;
+const fmtTime = (secs) => `${Math.floor(secs / 60)}:${String(secs % 60).padStart(2, '0')}`; // 90 → "1:30"
 const timesPlayed = (name) => state.games.filter((g) => g.name.toLowerCase() === name.toLowerCase()).length;
 
 // The kid whose turn it is to pick a game, or null once everyone has had a turn this pass.
@@ -134,13 +136,13 @@ function kidHasPoints(id) {
 }
 
 function totals() {
-  const t = Object.fromEntries(state.kids.map((k) => [k.id, 0]));
+  const sums = Object.fromEntries(state.kids.map((k) => [k.id, 0]));
   for (const g of state.games) {
     for (const [id, pts] of Object.entries(g.results)) {
-      if (id in t) t[id] += pts;
+      if (id in sums) sums[id] += pts;
     }
   }
-  return t;
+  return sums;
 }
 
 // ---------- Groups and bonus games ----------
@@ -219,14 +221,27 @@ function groupPreview(count, max) {
   return t('groupPreview', sizes.length, list);
 }
 
-// Points for a bonus game the kid managed: 2 if they are more than 3 points behind
-// the second-to-last kid (a chance to catch up), otherwise 1.
-function bonusPoints(kidId) {
-  const t = totals();
-  const sorted = Object.values(t).sort((a, b) => a - b);
-  if (sorted.length < 2) return 1;
-  return sorted[1] - (t[kidId] || 0) > 3 ? 2 : 1;
+// Last place: the lowest total (ties included) and behind the leader, so nobody
+// is "last" while everyone is level.
+function isLastPlace(kidId) {
+  const sums = totals();
+  const values = Object.values(sums);
+  if (values.length < 2) return false;
+  const mine = sums[kidId] || 0;
+  return mine === Math.min(...values) && mine < Math.max(...values);
 }
+
+// Points for a bonus game the kid managed, a chance to catch up: 3 if they are more
+// than 3 points behind the second-to-last kid (everyone else), 2 if they are in last
+// place, otherwise 1.
+function bonusPoints(kidId) {
+  const sums = totals();
+  const others = Object.entries(sums).filter(([id]) => id !== kidId).map(([, pts]) => pts);
+  if (others.length && Math.min(...others) - (sums[kidId] || 0) > 3) return 3;
+  return isLastPlace(kidId) ? 2 : 1;
+}
+// Why a bonus game is worth more: 'far' (3 points), 'last' (2 points) or null.
+const bonusReason = (pts) => (pts === 3 ? 'far' : pts === 2 ? 'last' : null);
 
 // ---------- Wheel weighting ----------
 // Each round a game is played in the current session halves its slice of the wheel;
@@ -240,12 +255,9 @@ const wheelWeight = (g, bonusW) => (isBonus(g) ? bonusW : 1) * Math.pow(0.5, g.p
 function bonusBase() {
   const kid = turnKid();
   if (!kid || state.kids.length < 2) return 0.5;
-  const t = totals();
-  const mine = t[kid.id] || 0;
-  const values = Object.values(t);
-  const leader = Math.max(...values);
-  if (mine === Math.min(...values) && mine < leader) return 1.5;
-  if (leader - mine >= 2) return 1;
+  if (isLastPlace(kid.id)) return 1.5;
+  const sums = totals();
+  if (Math.max(...Object.values(sums)) - (sums[kid.id] || 0) >= 2) return 1;
   return 0.5;
 }
 
@@ -396,6 +408,8 @@ function renderSetup() {
             <button class="avatar-btn" data-action="pick-avatar" data-id="${k.id}" title="${t('pickPicture')}" aria-label="${t('pickPictureFor', i + 1)}">${k.avatar}</button>
             <input class="name-input" data-id="${k.id}" type="text" maxlength="20"
               placeholder="${t('nameOfKid', i + 1)}" value="${esc(k.name)}" autocomplete="off">
+            <button class="icon-btn kid-delete" data-action="delete-kid" data-id="${k.id}" ${n <= MIN_KIDS ? 'disabled' : ''}
+              title="${t('removeKidTitle')}" aria-label="${t('removeKid', esc(k.name.trim()) || t('kidN', i + 1))}">🗑️</button>
           </li>`).join('')}
       </ol>
 
@@ -504,19 +518,27 @@ function renderGameList() {
               .concat(Array.from({ length: MAX_KIDS - 1 }, (_, i) => `<option value="${i + 2}">${i + 2}</option>`))
               .join('')
               .replace(`value="${max || ''}"`, `value="${max || ''}" selected`);
+            const secs = Number(g.timer) || 0;
+            const timerOptions = TIMER_STEPS
+              .map((s) => `<option value="${s}" ${s === secs ? 'selected' : ''}>${s ? fmtTime(s) : t('timerNone')}</option>`)
+              .join('');
             return `
               <li class="game-row ${g.active ? '' : 'off'}">
-                <div class="game-row-main">
+                <div class="game-row-head">
                   ${g.id === renamingGameId
                     ? `<input class="text-input rename-input" type="text" maxlength="40" value="${esc(g.name)}" data-id="${g.id}" autocomplete="off" aria-label="${t('newNameFor', esc(g.name))}">`
-                    : `<span class="game-row-name">${esc(g.name)}&nbsp;<button class="rename-btn" data-action="rename-game" data-id="${g.id}" title="${t('rename')}" aria-label="${t('renameName', esc(g.name))}">✏️</button>${isBonus(g) ? ` <span class="bonus-badge">${t('bonusBadge')}</span>` : ''}${isTeam(g) ? ` <span class="team-badge">${t('teamBadge')}</span>` : ''}</span>`}
-                  <span class="game-row-meta">${t('playedTimes', played)}${g.active ? `, ${t('wheelChance', chance[g.id])}` : ''}</span>
+                    : `<span class="game-row-name">${esc(g.name)}&nbsp;<button class="rename-btn" data-action="rename-game" data-id="${g.id}" title="${t('rename')}" aria-label="${t('renameName', esc(g.name))}">✏️</button>${isBonus(g) ? ` <span class="bonus-badge">${t('bonusBadge')}</span>` : ''}${isTeam(g) ? ` <span class="team-badge">${t('teamBadge')}</span>` : ''}${secs ? ` <span class="timer-badge">⏳ ${fmtTime(secs)}</span>` : ''}</span>`}
                 </div>
+                <div class="game-row-settings">
                 <label class="players-select">
                   <span>${t('players')}</span>
                   ${isTeam(g)
                     ? `<span class="players-fixed" title="${t('teamAllPlay')}">${t('all')}</span>`
                     : `<select class="game-max" data-id="${g.id}" aria-label="${t('howManyPlay', esc(g.name))}">${options}</select>`}
+                </label>
+                <label class="players-select">
+                  <span>${t('timeLabel')}</span>
+                  <select class="game-max game-timer" data-id="${g.id}" aria-label="${t('timerFor', esc(g.name))}">${timerOptions}</select>
                 </label>
                 <button class="team-toggle ${isTeam(g) ? 'on' : ''}" data-action="toggle-team" data-id="${g.id}" aria-pressed="${isTeam(g)}"
                   title="${t('playInTeams')}" aria-label="${t('asTeamGame', esc(g.name))}">
@@ -528,7 +550,9 @@ function renderGameList() {
                   <span class="switch-track"><span class="switch-knob"></span></span>
                   <span class="switch-label">${g.active ? t('on') : t('off')}</span>
                 </button>
-                <button class="icon-btn" data-action="delete-list-game" data-id="${g.id}" title="${t('deleteGame')}" aria-label="${t('deleteName', esc(g.name))}">🗑️</button>
+                <button class="icon-btn game-row-delete" data-action="delete-list-game" data-id="${g.id}" title="${t('deleteGame')}" aria-label="${t('deleteName', esc(g.name))}">🗑️</button>
+                </div>
+                <p class="game-row-meta">${t('playedTimes', played)}${g.active ? `, ${t('wheelChance', chance[g.id])}` : ''}</p>
               </li>`;
           }).join('')}
         </ul>` : `<p class="muted">${t('noGamesYet')}</p>`}
@@ -769,7 +793,7 @@ function bonusNote() {
   return `
     <div class="bonus-note" style="${kidStyle(kid)}">
       <span class="bonus-badge big">${t('bonusPrize')}</span>
-      <p>${t('bonusNote', esc(kid.name), pointsText(pts), pts === 2)}</p>
+      <p>${t('bonusNote', esc(kid.name), pointsText(pts), bonusReason(pts))}</p>
     </div>`;
 }
 
@@ -872,11 +896,11 @@ function startWheel(slices) {
     raf: 0,
   };
 
-  const frame = (t) => {
+  const frame = (now) => {
     if (!wheel) return;
-    const dt = Math.min(0.1, (t - wheel.last) / 1000);
-    wheel.last = t;
-    const elapsed = t - wheel.started;
+    const dt = Math.min(0.1, (now - wheel.last) / 1000);
+    wheel.last = now;
+    const elapsed = now - wheel.started;
 
     if (wheel.phase === 'slow' && elapsed >= WHEEL_SLOW_MS) {
       wheel.phase = 'ramp';
@@ -999,6 +1023,7 @@ function renderGameInProgress() {
       </div>
       ${strip}
 
+      <div class="game-body">
       <div class="participants">
         ${g.participants.map((id) => {
           const k = kidById(id);
@@ -1025,7 +1050,10 @@ function renderGameInProgress() {
             </div>`;
         }).join('')}
       </div>
+      ${timerPanel('side')}
+      </div>
     </section>`;
+  updateTimerUI();
 }
 
 // A bonus game: only the picking kid plays, and the result is just "geschafft" or not.
@@ -1047,25 +1075,28 @@ function renderBonusInProgress() {
         <span class="round-avatar">${kid.avatar}</span>
         <span class="round-name">${esc(kid.name)}</span>
       </div>
-      <p class="round-text">${pts === 2 ? t('bonusIfTwo') : t('bonusIfOne')}</p>
+      <p class="round-text">${t('bonusIf', pts, bonusReason(pts))}</p>
+      ${timerPanel('row')}
       <div class="round-actions">
         <button class="btn primary huge" data-default data-action="bonus-result" data-ok="1">${t('madeIt')}</button>
         <button class="btn huge" data-action="bonus-result" data-ok="0">${t('didntMakeIt')}</button>
       </div>
       <button class="btn small-btn skip-btn" data-action="cancel-game">${t('cancel')}</button>
     </section>`;
+  updateTimerUI();
 }
 
 // The two teams side by side: Rot on the left, Blau on the right.
-// `results`/`winner` are given on the result screen to show points and the winner.
-function teamPanels(teams, { results = null, winner = null } = {}) {
+// `results`/`winner` are given on the result screen to show points and the winner;
+// `center` replaces the "gegen" between the teams (the hourglass of a timed game).
+function teamPanels(teams, { results = null, winner = null, center = '' } = {}) {
   const panel = (team) => {
-    const t = TEAMS[team];
+    const info = TEAMS[team];
     const won = winner === team;
     return `
-      <div class="team-panel team-${team} ${won ? 'won' : ''} ${winner && winner !== 'draw' && !won ? 'lost' : ''}" style="--team:${t.color}">
+      <div class="team-panel team-${team} ${won ? 'won' : ''} ${winner && winner !== 'draw' && !won ? 'lost' : ''}" style="--team:${info.color}">
         <div class="team-head">
-          <span class="team-name">${t.icon} ${t.name}</span>
+          <span class="team-name">${info.icon} ${info.name}</span>
           ${won ? `<span class="team-crown">${t('winnerCrown')}</span>` : ''}
         </div>
         <ul class="team-kids">
@@ -1081,7 +1112,7 @@ function teamPanels(teams, { results = null, winner = null } = {}) {
         </ul>
       </div>`;
   };
-  return `<div class="team-split">${panel('red')}<div class="team-vs">${t('versus')}</div>${panel('blue')}</div>`;
+  return `<div class="team-split">${panel('red')}${center || `<div class="team-vs">${t('versus')}</div>`}${panel('blue')}</div>`;
 }
 
 // A team game in progress: the teams, and who won. No default button on purpose:
@@ -1101,13 +1132,14 @@ function renderTeamInProgress() {
           <button class="btn" data-action="team-shuffle">${t('shuffle')}</button>
         </div>
       </div>
-      ${teamPanels(g.teams)}
+      ${teamPanels(g.teams, { center: timerPanel('side') })}
       <div class="actions center team-actions">
         <button class="btn huge team-btn" style="--team:${TEAMS.red.color}" data-action="team-win" data-team="red">${TEAMS.red.icon} ${t('teamWins', TEAMS.red.name)}</button>
         <button class="btn huge" data-action="team-win" data-team="draw">${t('draw')}</button>
         <button class="btn huge team-btn" style="--team:${TEAMS.blue.color}" data-action="team-win" data-team="blue">${TEAMS.blue.icon} ${t('teamWins', TEAMS.blue.name)}</button>
       </div>
     </section>`;
+  updateTimerUI();
 }
 
 // Result of a team game: "Sieger Team Rot", then both teams with their points.
@@ -1128,15 +1160,178 @@ function renderTeamResult(gameId) {
       <div class="actions center">${resultButtons()}</div>
     </section>`;
   if (winner && winner !== 'draw') {
-    const t = TEAMS[winner];
+    const info = TEAMS[winner];
     // Fanfare for the winners first; a soft "oh" only once the losing team fades.
-    showWinnerPop([{ name: t.name, color: t.color }], () => {
+    showWinnerPop([{ name: info.name, color: info.color }], () => {
       confetti();
       setTimeout(() => Sound.oh(), 500);
     });
   } else {
     Sound.picked();
   }
+}
+
+// ---------- Game timer (hourglass) ----------
+// Games with a `timer` (seconds) show an hourglass with Start / Pause / Reset.
+// The countdown lives outside the saved state (a refresh starts it over) and runs
+// on the clock, so it keeps going while another screen is open; the alarm sounds
+// wherever you are. Each group, and each new game, gets a full hourglass.
+let gameTimer = null; // { key, total, elapsed, since, done, flipping, interval }
+
+const timerKey = (g) => `${g.gameId}|${g.startedAt}|${g.groupIndex || 0}`;
+const timerElapsed = (tm) => tm.elapsed + (tm.since !== null ? performance.now() - tm.since : 0);
+const timerPhase = (tm) => (tm.done ? 'done' : tm.since !== null ? 'running' : tm.elapsed > 0 ? 'paused' : 'ready');
+
+function clearGameTimer() {
+  if (gameTimer) clearInterval(gameTimer.interval);
+  gameTimer = null;
+}
+
+// The timer for the running game (and group), created full when needed; null if the game has none.
+function ensureGameTimer() {
+  const g = state.current;
+  if (!g || !g.timer) {
+    clearGameTimer();
+    return null;
+  }
+  const key = timerKey(g);
+  if (!gameTimer || gameTimer.key !== key) {
+    clearGameTimer();
+    gameTimer = { key, total: g.timer * 1000, elapsed: 0, since: null, done: false, flipping: false, interval: 0 };
+  }
+  return gameTimer;
+}
+
+const GLASS_PATH = 'M20 12 H80 C80 46 54 66 54 80 C54 94 80 114 80 148 H20 C20 114 46 94 46 80 C46 66 20 46 20 12 Z';
+const SAND_TOP = { neck: 80, height: 62 };     // top bulb: sand sits on the neck and sinks
+const SAND_BOTTOM = { floor: 148, height: 60 }; // bottom bulb: the pile grows from the floor
+
+// `layout`: 'side' (hourglass above the controls) or 'row' (side by side, for the bonus screen).
+function timerPanel(layout = 'side') {
+  if (!ensureGameTimer()) return '';
+  return `
+    <div class="timer-panel ${layout}" id="game-timer">
+      <div class="hourglass-wrap" id="hourglass">
+        <svg class="hourglass" viewBox="0 0 100 160" aria-hidden="true">
+          <defs><clipPath id="glass-clip"><path d="${GLASS_PATH}"/></clipPath></defs>
+          <path class="hg-glass" d="${GLASS_PATH}"/>
+          <g clip-path="url(#glass-clip)">
+            <rect id="sand-top" class="hg-sand" x="0" width="100" y="${SAND_TOP.neck - SAND_TOP.height}" height="${SAND_TOP.height}"/>
+            <rect id="sand-bottom" class="hg-sand" x="0" width="100" y="${SAND_BOTTOM.floor}" height="0"/>
+            <line id="sand-stream" class="hg-stream" x1="50" x2="50" y1="${SAND_TOP.neck}" y2="${SAND_BOTTOM.floor}"/>
+          </g>
+          <path class="hg-outline" d="${GLASS_PATH}"/>
+          <rect class="hg-frame" x="8" y="4" width="84" height="9" rx="3"/>
+          <rect class="hg-frame" x="8" y="147" width="84" height="9" rx="3"/>
+        </svg>
+      </div>
+      <div class="timer-side">
+        <div class="timer-readout" id="timer-readout" aria-live="polite"></div>
+        <div class="timer-buttons">
+          <button class="btn timer-btn" data-action="timer-start" id="timer-start">${t('timerStart')}</button>
+          <button class="btn timer-btn" data-action="timer-pause" id="timer-pause">${t('timerPause')}</button>
+          <button class="btn timer-btn" data-action="timer-reset" id="timer-reset">${t('timerReset')}</button>
+        </div>
+      </div>
+    </div>`;
+}
+
+// Brings the hourglass, the time and the buttons up to date (called every tick and after each change).
+function updateTimerUI() {
+  const tm = gameTimer;
+  const panel = document.getElementById('game-timer');
+  if (!tm || !panel) return;
+  const phase = timerPhase(tm);
+  const left = Math.max(0, tm.total - timerElapsed(tm));
+  panel.dataset.phase = phase;
+
+  if (!tm.flipping) {
+    const frac = left / tm.total;
+    const top = SAND_TOP.height * frac;
+    const bottom = SAND_BOTTOM.height * (1 - frac);
+    const topRect = document.getElementById('sand-top');
+    topRect.setAttribute('y', SAND_TOP.neck - top);
+    topRect.setAttribute('height', top);
+    const bottomRect = document.getElementById('sand-bottom');
+    bottomRect.setAttribute('y', SAND_BOTTOM.floor - bottom);
+    bottomRect.setAttribute('height', bottom);
+    document.getElementById('sand-stream').setAttribute('y2', SAND_BOTTOM.floor - bottom);
+  }
+  document.getElementById('timer-readout').textContent = phase === 'done' ? t('timeUp') : fmtTime(Math.ceil(left / 1000));
+
+  const start = document.getElementById('timer-start');
+  const pause = document.getElementById('timer-pause');
+  const reset = document.getElementById('timer-reset');
+  start.textContent = phase === 'paused' ? t('timerResume') : t('timerStart');
+  start.disabled = phase === 'running' || phase === 'done';
+  pause.disabled = phase !== 'running';
+  reset.disabled = phase === 'ready' || tm.flipping;
+  // The yellow "space bar" button follows what space does: start/resume, pause,
+  // and once the time is up the screen's own default (e.g. "Spiel fertig").
+  start.classList.toggle('primary', phase === 'ready' || phase === 'paused');
+  pause.classList.toggle('primary', phase === 'running');
+  const handPicked = state.current && (state.current.bonus || state.current.team); // space never ends these
+  app.querySelector('[data-default]')?.classList.toggle('primary', phase === 'done' && !handPicked);
+}
+
+function tickTimer() {
+  const tm = gameTimer;
+  if (!tm || !state.current || timerKey(state.current) !== tm.key) {
+    clearGameTimer();
+    return;
+  }
+  if (timerElapsed(tm) >= tm.total) {
+    tm.elapsed = tm.total;
+    tm.since = null;
+    tm.done = true;
+    clearInterval(tm.interval);
+    Sound.alarm();
+  }
+  updateTimerUI();
+}
+
+function startTimer() {
+  const tm = gameTimer;
+  if (!tm || tm.done || tm.since !== null || tm.flipping) return;
+  tm.since = performance.now();
+  tm.interval = setInterval(tickTimer, 50);
+  updateTimerUI();
+}
+
+function pauseTimer() {
+  const tm = gameTimer;
+  if (!tm || tm.since === null) return;
+  tm.elapsed = timerElapsed(tm);
+  tm.since = null;
+  clearInterval(tm.interval);
+  updateTimerUI();
+}
+
+// Turns the hourglass over (a half turn), then shows it full again.
+function resetTimer() {
+  const tm = gameTimer;
+  if (!tm || tm.flipping) return;
+  clearInterval(tm.interval);
+  Object.assign(tm, { elapsed: 0, since: null, done: false });
+  const wrap = document.getElementById('hourglass');
+  let finished = false;
+  const finish = () => {
+    if (finished) return;
+    finished = true;
+    tm.flipping = false;
+    wrap?.classList.remove('flip');
+    updateTimerUI();
+  };
+  setTimeout(finish, 1000); // in case the screen is redrawn mid-turn and animationend never comes
+  if (!wrap || matchMedia('(prefers-reduced-motion: reduce)').matches) {
+    finish();
+    return;
+  }
+  tm.flipping = true;
+  Sound.flip();
+  wrap.classList.add('flip');
+  wrap.addEventListener('animationend', finish, { once: true });
+  updateTimerUI();
 }
 
 function startGame() {
@@ -1177,6 +1372,8 @@ function beginGame(game, participantIds) {
     bonus,
     team,
     teams: team ? splitTeams(ordered) : null,
+    timer: Number(game.timer) || 0, // seconds on the hourglass, 0 = no timer
+    startedAt: Date.now(),
     groups,
     groupIndex: 0,
     done: [],
@@ -1470,6 +1667,7 @@ function confetti() {
 // during the animation skips to the start screen.
 const INTRO_READY_MS = 4000; // when the "start" prompt appears (matches the CSS timeline)
 const INTRO_MUSIC_AT_MS = 1600; // the music kicks in when the title words slam together
+const INTRO_SPIN_MS = 3500; // one full turn of the avatar ring, after the avatars have burst out
 let intro = null; // { el, ready, timers, stopSound } while the intro is showing
 
 // The kids' own avatars circle the title; before a party, a random selection.
@@ -1485,10 +1683,8 @@ function showIntro() {
   document.querySelector('.winner-pop')?.remove();
   const guests = introGuests();
   const ring = guests.map((g, i) => {
-    const a = (i / guests.length) * 2 * Math.PI;
-    const x = 50 + 43 * Math.sin(a);
-    const y = 50 - 41 * Math.cos(a);
-    const vars = `--kid:${g.color};--x:${x}vw;--y:${y}vh;--dx:${50 - x}vw;--dy:${50 - y}vh;--d:${(1.9 + i * 0.05).toFixed(2)}s`;
+    const [x, y] = guestPos(i, guests.length, 0);
+    const vars = `--kid:${g.color};--x:${x}vw;--y:${y}vh;--dx:${50 - x}vw;--dy:${50 - y}vh;--d:${(1.9 + i * 0.05).toFixed(2)}s;--i:${i}`;
     return `<span class="intro-guest" style="${vars}" aria-hidden="true"><span>${esc(g.avatar)}</span></span>`;
   }).join('');
 
@@ -1510,15 +1706,56 @@ function showIntro() {
   el.addEventListener('click', advanceIntro);
   document.body.appendChild(el);
 
+  // The ring starts its turn once the last avatar has burst out.
+  const spinAt = 1900 + (guests.length - 1) * 50 + 700 + 100;
+  const reduced = matchMedia('(prefers-reduced-motion: reduce)').matches;
   intro = {
     el,
     ready: false,
+    raf: 0,
     startedAt: performance.now(),
     stopSound: Sound.intro(),
     timers: [setTimeout(confetti, 2400), setTimeout(introReady, INTRO_READY_MS)],
   };
+  if (!reduced) intro.timers.push(setTimeout(spinIntroGuests, spinAt));
   Sound.musicStart(INTRO_MUSIC_AT_MS / 1000);
-  if (matchMedia('(prefers-reduced-motion: reduce)').matches) introReady();
+  if (reduced) introReady();
+}
+
+// Where avatar i of n sits on the oval around the title, turned on by `offset` radians.
+function guestPos(i, n, offset) {
+  const a = (i / n) * 2 * Math.PI + offset;
+  return [50 + 43 * Math.sin(a), 50 - 41 * Math.cos(a)];
+}
+
+function placeIntroGuests(offset) {
+  const els = intro.el.querySelectorAll('.intro-guest');
+  els.forEach((el, i) => {
+    const [x, y] = guestPos(i, els.length, offset);
+    el.style.setProperty('--x', `${x}vw`);
+    el.style.setProperty('--y', `${y}vh`);
+  });
+}
+
+// The avatar ring goes once all the way round (easing in and out) and stops where it
+// started; then the avatars hop left and right in place.
+function spinIntroGuests() {
+  if (!intro) return;
+  const start = performance.now();
+  const step = (now) => {
+    if (!intro) return;
+    const p = Math.min(1, (now - start) / INTRO_SPIN_MS);
+    const eased = p < 0.5 ? 2 * p * p : 1 - (-2 * p + 2) ** 2 / 2;
+    placeIntroGuests(eased * 2 * Math.PI);
+    if (p < 1) intro.raf = requestAnimationFrame(step);
+    else intro.el.classList.add('dance');
+  };
+  intro.raf = requestAnimationFrame(step);
+}
+
+function stopIntroSpin() {
+  cancelAnimationFrame(intro.raf);
+  placeIntroGuests(0);
 }
 
 function introReady() {
@@ -1534,11 +1771,15 @@ function advanceIntro() {
     intro.stopSound();
     // Start the music now if it hadn't begun yet (or couldn't play before this first press).
     if (performance.now() - intro.startedAt < INTRO_MUSIC_AT_MS || !Sound.musicPlaying) Sound.musicStart(0);
+    stopIntroSpin();
     intro.el.classList.add('skip');
+    if (!matchMedia('(prefers-reduced-motion: reduce)').matches) intro.el.classList.add('dance');
     introReady();
     return;
   }
   const { el } = intro;
+  intro.timers.forEach(clearTimeout);
+  cancelAnimationFrame(intro.raf);
   intro = null;
   Sound.musicStop(0.8);
   Sound.click();
@@ -1632,7 +1873,7 @@ settingsBtn.addEventListener('click', () => {
 renderShell();
 
 // Buttons with a sound of their own (instead of the normal click).
-const OWN_SOUND_ACTIONS = new Set(['wheel-stop', 'team-shuffle']);
+const OWN_SOUND_ACTIONS = new Set(['wheel-stop', 'team-shuffle', 'timer-reset']);
 
 // ---------- Events ----------
 document.addEventListener('click', (e) => {
@@ -1662,6 +1903,22 @@ document.addEventListener('click', (e) => {
       state.kids.pop();
       saveState();
       renderSetup();
+      break;
+    }
+    case 'delete-kid': {
+      // Removes this kid; the list (and the count above it) closes up as if
+      // there had been one kid fewer from the start.
+      const index = state.kids.findIndex((k) => k.id === id);
+      const kid = state.kids[index];
+      if (!kid || state.kids.length <= MIN_KIDS) break;
+      if (kidHasPoints(kid.id) && !confirm(t('confirmRemoveKid', kid.name.trim() || t('kidN', index + 1)))) break;
+      state.kids.splice(index, 1);
+      if (index < state.round.turn) state.round.turn--; // keep the same kid's turn
+      if (draft) draft.participants = draft.participants.filter((x) => x !== kid.id);
+      saveState();
+      renderSetup();
+      const rows = document.querySelectorAll('.kid-row .name-input');
+      rows[Math.min(index, rows.length - 1)]?.focus();
       break;
     }
     case 'pick-avatar':
@@ -1825,6 +2082,15 @@ document.addEventListener('click', (e) => {
     case 'finish-game':
       finishGame();
       break;
+    case 'timer-start':
+      startTimer();
+      break;
+    case 'timer-pause':
+      pauseTimer();
+      break;
+    case 'timer-reset':
+      resetTimer();
+      break;
     case 'team-win': {
       const g = state.current;
       if (g?.team) {
@@ -1876,7 +2142,16 @@ document.addEventListener('click', (e) => {
 });
 
 document.addEventListener('change', (e) => {
-  if (e.target.classList.contains('game-max')) {
+  if (e.target.classList.contains('game-timer')) {
+    const g = gameById(e.target.dataset.id);
+    if (g) {
+      Sound.click();
+      g.timer = Number(e.target.value) || 0;
+      saveState();
+      renderGameList();
+      document.querySelector(`.game-timer[data-id="${g.id}"]`)?.focus();
+    }
+  } else if (e.target.classList.contains('game-max')) {
     const g = gameById(e.target.dataset.id);
     if (g) {
       Sound.click();
@@ -1897,18 +2172,18 @@ document.addEventListener('submit', (e) => {
 });
 
 document.addEventListener('input', (e) => {
-  const t = e.target;
-  if (t.classList.contains('name-input')) {
-    const kid = kidById(t.dataset.id);
+  const el = e.target;
+  if (el.classList.contains('name-input')) {
+    const kid = kidById(el.dataset.id);
     if (kid) {
-      kid.name = t.value;
-      t.classList.remove('invalid');
+      kid.name = el.value;
+      el.classList.remove('invalid');
       saveState();
     }
-  } else if (t.classList.contains('points-input')) {
-    state.points[t.dataset.place] = Math.max(0, Math.min(99, parseInt(t.value, 10) || 0));
+  } else if (el.classList.contains('points-input')) {
+    state.points[el.dataset.place] = Math.max(0, Math.min(99, parseInt(el.value, 10) || 0));
     saveState();
-  } else if (t.id === 'new-game' || t.classList.contains('rename-input')) {
+  } else if (el.id === 'new-game' || el.classList.contains('rename-input')) {
     document.getElementById('games-error').hidden = true;
   }
 });
@@ -1926,8 +2201,7 @@ const WHEEL_RESULT_SPACE_DELAY_MS = 1500; // ignore space right after "Stopp" so
 const isSpace = (e) => e.key === ' ' || e.code === 'Space';
 
 function handleSpace(e) {
-  const t = e.target;
-  if (t.closest?.('input, textarea, select, [contenteditable]') || document.querySelector('.overlay')) return;
+  if (e.target.closest?.('input, textarea, select, [contenteditable]') || document.querySelector('.overlay')) return;
   e.preventDefault(); // also stops the focused button from being pressed natively
   if (e.repeat) return;
 
@@ -1945,6 +2219,20 @@ function handleSpace(e) {
       return;
     }
     if (performance.now() - wheel.doneAt < WHEEL_RESULT_SPACE_DELAY_MS) return;
+  }
+  // Timed game: space starts, pauses and resumes the hourglass. Once the time is
+  // up it presses the screen's default ("Spiel fertig"), except in bonus and team
+  // games, whose result is always picked by hand.
+  if (gameTimer && state.current && document.getElementById('game-timer')) {
+    const phase = timerPhase(gameTimer);
+    if (phase !== 'done') {
+      if (gameTimer.flipping) return;
+      Sound.click();
+      if (phase === 'running') pauseTimer();
+      else startTimer();
+      return;
+    }
+    if (state.current.bonus || state.current.team) return;
   }
   const button = app.querySelector('[data-default]:not([disabled]):not([hidden])');
   if (button) button.click();

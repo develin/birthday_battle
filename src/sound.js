@@ -231,6 +231,29 @@ const Sound = (() => {
         setTimeout(() => bus.disconnect(), 200);
       };
     },
+    // The game timer ran out: a loud alarm (three bursts of fast beeps), louder
+    // than the other sounds on purpose, so it is heard over a noisy party.
+    alarm() {
+      const c = audio();
+      if (!c) return;
+      const loud = c.createGain();
+      loud.gain.value = 0.9;
+      loud.connect(c.destination); // bypasses the master volume
+      out = loud;
+      for (let burst = 0; burst < 3; burst++) {
+        for (let i = 0; i < 4; i++) {
+          const start = burst * 0.7 + i * 0.12;
+          tone({ freq: i % 2 ? 1175 : 880, type: 'square', start, dur: 0.1, vol: 0.5 });
+        }
+      }
+      out = null;
+      setTimeout(() => loud.disconnect(), 2500);
+    },
+    // The hourglass is turned over (timer reset): a quick rising swish.
+    flip() {
+      tone({ freq: 300, type: 'triangle', dur: 0.5, vol: 0.25, slideTo: 900 });
+      noise({ dur: 0.45, vol: 0.12, freq: 1500 });
+    },
     // Teams re-drawn: a quick shuffle of ticks.
     shuffle() {
       for (let i = 0; i < 7; i++) noise({ start: i * 0.045, dur: 0.03, vol: 0.25, freq: 1800 + i * 300 });

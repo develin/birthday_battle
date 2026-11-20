@@ -201,6 +201,8 @@ h2 { font-weight: 800; font-size: 1.35rem; margin: 0 0 0.6rem; }
   text-decoration: none;
 }
 .icon-btn:hover { background: var(--panel-hi); }
+.icon-btn:disabled:hover { background: none; }
+.kid-delete { flex: none; }
 
 .actions { display: flex; flex-wrap: wrap; align-items: center; gap: 0.8rem; margin-top: 1.5rem; }
 .actions.center { justify-content: center; }
@@ -701,10 +703,11 @@ h2 { font-weight: 800; font-size: 1.35rem; margin: 0 0 0.6rem; }
   grid-template-columns: repeat(auto-fill, minmax(22rem, 1fr));
   gap: 0.7rem;
 }
+/* Each game card has three lines: name, settings, and how often it was played / its wheel chance. */
 .game-row {
   display: flex;
-  align-items: center;
-  gap: 0.8rem;
+  flex-direction: column;
+  gap: 0.5rem;
   padding: 0.6rem 0.6rem 0.6rem 1rem;
   border-radius: 0.9rem;
   border-left: 0.45rem solid var(--party);
@@ -712,9 +715,11 @@ h2 { font-weight: 800; font-size: 1.35rem; margin: 0 0 0.6rem; }
 }
 .game-row.off { border-left-color: var(--panel-hi); background: color-mix(in srgb, var(--panel) 55%, var(--stage)); }
 .game-row.off .game-row-name { color: var(--lilac); text-decoration: line-through; }
-.game-row-main { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.game-row-head { min-width: 0; }
+.game-row-settings { display: flex; align-items: center; flex-wrap: wrap; gap: 0.8rem; }
+.game-row-delete { margin-left: auto; }
 .game-row-name { font-weight: 800; font-size: 1.2rem; line-height: 1.2; }
-.game-row-meta { font-size: 0.9rem; color: var(--lilac); }
+.game-row-meta { margin: 0; font-size: 0.9rem; color: var(--lilac); }
 .rename-btn {
   padding: 0.05rem 0.3rem;
   vertical-align: 0.1em;
@@ -1009,6 +1014,65 @@ h2 { font-weight: 800; font-size: 1.35rem; margin: 0 0 0.6rem; }
 }
 @keyframes fall { to { transform: translateY(110vh) rotate(540deg); } }
 
+/* ---------- Game timer (hourglass) ---------- */
+.game-body { flex: 1; min-height: 0; display: flex; gap: 1.2rem; align-items: flex-start; }
+.game-body .participants { flex: 1; min-width: 0; }
+.timer-badge {
+  display: inline-block;
+  padding: 0.05rem 0.5rem;
+  border-radius: 999px;
+  background: var(--stage-deep);
+  color: var(--party-hi);
+  font-size: 0.8rem;
+  vertical-align: 0.15em;
+}
+.timer-panel {
+  flex: none;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.6rem;
+  padding: 0.8rem 1rem;
+  border-radius: 1.2rem;
+  background: var(--panel);
+}
+.timer-panel.row { flex-direction: row; gap: 1.2rem; padding: 0.4rem 1.2rem; margin: 0 0 0.8rem; }
+.timer-side { display: flex; flex-direction: column; align-items: center; gap: 0.5rem; }
+.timer-buttons { display: flex; flex-direction: column; gap: 0.4rem; width: 100%; }
+.timer-panel.row .timer-buttons { flex-direction: row; }
+.timer-btn { padding: 0.35rem 1rem; font-size: 1rem; }
+.timer-readout { font-family: var(--display); font-size: 2.2rem; line-height: 1; font-variant-numeric: tabular-nums; }
+.timer-panel[data-phase="done"] .timer-readout { color: var(--danger); font-size: 1.5rem; }
+
+.hourglass-wrap { height: min(13rem, 27vh); aspect-ratio: 100 / 160; }
+.timer-panel.row .hourglass-wrap { height: min(5rem, 11vh); }
+.team-split > .timer-panel .hourglass-wrap { height: min(10rem, 19vh); }
+.team-split > .timer-panel .timer-readout { font-size: 1.8rem; }
+/* Bonus game with a timer: a smaller kid, so everything still fits the screen. */
+.round-screen:has(.timer-panel) .round-avatar { font-size: 4.5rem; }
+.round-screen:has(.timer-panel) .round-name { font-size: 3rem; }
+.round-screen:has(.timer-panel) .round-text { margin: 0.2rem 0 0.5rem; }
+.hourglass { display: block; width: 100%; height: 100%; overflow: visible; }
+.hg-glass { fill: rgba(255, 255, 255, 0.07); }
+.hg-outline { fill: none; stroke: var(--lilac); stroke-width: 2.5; }
+.hg-frame { fill: var(--bronze); }
+.hg-sand { fill: var(--party); }
+.hg-stream { stroke: var(--party); stroke-width: 2.5; stroke-dasharray: 4 3; opacity: 0; }
+.timer-panel[data-phase="running"] .hg-stream { opacity: 1; animation: sand-fall 0.35s linear infinite; }
+@keyframes sand-fall { to { stroke-dashoffset: -7; } }
+
+/* Reset: the hourglass is turned over. */
+.hourglass-wrap.flip { animation: hg-flip 0.8s ease-in-out; }
+@keyframes hg-flip { to { transform: rotate(180deg); } }
+/* Time's up: the hourglass shakes and glows red. */
+.timer-panel[data-phase="done"] { box-shadow: 0 0 0 0.25rem var(--danger); animation: timer-alarm 0.5s ease-in-out 3; }
+@keyframes timer-alarm {
+  25% { transform: rotate(-3deg) scale(1.03); }
+  75% { transform: rotate(3deg) scale(1.03); }
+}
+/* In a team game the hourglass stands between Rot and Blau. */
+.team-split > .timer-panel { align-self: center; }
+
 /* ---------- Intro (page open / logo click) ----------
    Timeline: drum roll 0–1.6 s, words slam together at 1.6 s, cake and avatars
    1.8–2.5 s, fanfare + confetti 2.4 s, tagline 3.4 s, start prompt 4 s (JS). */
@@ -1128,13 +1192,24 @@ h2 { font-weight: 800; font-size: 1.35rem; margin: 0 0 0.6rem; }
 .intro.crowded .intro-guest { font-size: min(4vw, 6.5vh); }
 @keyframes guest-burst { from { transform: translate(var(--dx), var(--dy)) scale(0); } }
 @keyframes guest-bob { to { transform: translateY(-1.5vh) rotate(8deg); } }
+/* After the ring's full turn: little hops to the left and right, slightly out of step. */
+.intro.dance .intro-guest > span {
+  animation: guest-hop 0.9s ease-in-out infinite;
+  animation-delay: calc(var(--i) * -0.15s);
+}
+@keyframes guest-hop {
+  0%, 50%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-0.9vw, -2vh) rotate(-10deg); }
+  75% { transform: translate(0.9vw, -2vh) rotate(10deg); }
+}
 
 /* Skipped: jump the one-off animations to their end. */
 .intro.skip :is(.intro-center, .intro-cake, .intro-word, .intro-tagline, .intro-guest) { animation: none; }
 .intro.skip .intro-flash { display: none; }
 
 @media (prefers-reduced-motion: reduce) {
-  .intro-beam, .intro-guest, .intro-guest > span, .intro.ready .intro-start,
+  .timer-panel[data-phase="done"], .timer-panel[data-phase="running"] .hg-stream { animation: none; }
+  .intro-beam, .intro-guest, .intro-guest > span, .intro.dance .intro-guest > span, .intro.ready .intro-start,
   .intro :is(.intro-center, .intro-cake, .intro-word, .intro-tagline) { animation: none; }
   .intro-flash { display: none; }
 }
@@ -1151,6 +1226,10 @@ h2 { font-weight: 800; font-size: 1.35rem; margin: 0 0 0.6rem; }
 /* ---------- Narrow and portrait screens (laptop windows, tablets, phones) ---------- */
 @media (max-width: 900px), (max-aspect-ratio: 1/1) {
   body { height: auto; min-height: 100dvh; }
+  .game-body { flex-direction: column-reverse; align-items: stretch; }
+  .timer-panel { flex-direction: row; justify-content: center; }
+  .timer-panel .hourglass-wrap { height: 8rem; }
+  .team-split > .timer-panel { grid-column: 1 / -1; }
   .app { overflow: visible; }
   .screen.fit { height: auto; }
   .screen.scores-screen { grid-template-columns: 1fr; }

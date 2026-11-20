@@ -10,6 +10,10 @@ const ordinalEn = (n) => {
   const s = n % 100 >= 11 && n % 100 <= 13 ? 'th' : ({ 1: 'st', 2: 'nd', 3: 'rd' }[n % 10] || 'th');
   return `${n}${s}`;
 };
+// Why a bonus game is worth more (see bonusReason in app.js).
+const reasonDe = { last: 'auf dem letzten Platz bist', far: 'weit hinten liegst' };
+const reasonEn = { last: 'in last place right now', far: 'far behind right now' };
+
 const STRINGS = {
   de: {
     // Words and numbers
@@ -78,6 +82,9 @@ const STRINGS = {
     noNameMany: (n) => `${n} Kinder haben noch keinen Namen.`,
     confirmRemoveKid: (label) => `${label} entfernen? Die Punkte gehen dann verloren.`,
     theLastKid: 'das letzte Kind',
+    kidN: (n) => `Kind ${n}`,
+    removeKid: (label) => `${label} entfernen`,
+    removeKidTitle: 'Kind entfernen',
     confirmReset: 'Neue Party starten? Alle Kinder, Spiele und Punkte werden gelöscht. Die Spieleliste bleibt.',
 
     // Game list
@@ -105,10 +112,19 @@ const STRINGS = {
     noGamesYet: 'Noch keine Spiele. Füge oben ein Spiel hinzu.',
     alreadyInList: (name) => `„${name}“ ist schon in der Liste.`,
     confirmDeleteListGame: (name) => `„${name}“ aus der Liste löschen?`,
+    timeLabel: 'Zeit',
+    timerNone: 'Keine',
+    timerFor: (name) => `Wie viel Zeit gibt es für ${name}?`,
+    timerStart: '▶ Start',
+    timerResume: '▶ Weiter',
+    timerPause: '⏸ Pause',
+    timerReset: '↺ Von vorn',
+    timeUp: 'Zeit ist um!',
     gamesNotes: [
       '<strong>Spieler:</strong> wie viele Kinder gleichzeitig spielen. Sind es mehr Kinder, wird in Gruppen gespielt, die gleich groß ausgelost werden. Jede Gruppe bekommt ihre eigenen Punkte.',
       '<strong>Team:</strong> Alle Kinder spielen zusammen, ausgelost in Team Rot und Team Blau. Das Gewinnerteam bekommt die Punkte für den 1. Platz, das andere Team die für den 2. Platz. Bei Unentschieden bekommen alle die Punkte für den 2. Platz.',
-      '<strong>1 (Bonus):</strong> Nur das Kind, das dran ist, spielt. Geschafft gibt 1 Punkt, oder 2 Punkte, wenn es mehr als 3 Punkte hinter dem Vorletzten liegt.',
+      '<strong>1 (Bonus):</strong> Nur das Kind, das dran ist, spielt. Geschafft gibt 1 Punkt. Ist das Kind gerade auf dem letzten Platz, gibt es 2 Punkte, und liegt es mehr als 3 Punkte hinter dem Vorletzten, sogar 3 Punkte.',
+      '<strong>Zeit:</strong> Mit einer Zeit zeigt das Spiel eine Sanduhr. Die Leertaste startet sie und hält sie an. Ist die Zeit um, gibt es einen lauten Ton.',
       '<strong>Glücksrad:</strong> Spiele, die aus sind, kommen nicht aufs Rad. Jedes Mal, wenn ein Spiel gespielt wurde, wird sein Feld halb so groß, bis alle Spiele einmal dran waren. Bonusspiele sind halb so oft dran, aber öfter, wenn das Kind, das dran ist, weit hinten liegt.',
     ],
 
@@ -131,7 +147,7 @@ const STRINGS = {
     playedBefore: 'Schon gespielt',
     none: 'Keiner',
     teamPreview: '🔴🔵 Teamspiel: Die Kinder werden in Team Rot und Team Blau ausgelost.',
-    bonusNote: (name, pts, behind) => `Nur <strong>${name}</strong> spielt. Geschafft gibt ${pts}${behind ? ', weil du gerade weit hinten liegst' : ''}. Nicht geschafft gibt 0 Punkte.`,
+    bonusNote: (name, pts, reason) => `Nur <strong>${name}</strong> spielt. Geschafft gibt ${pts}${reason ? `, weil du gerade ${reasonDe[reason]}` : ''}. Nicht geschafft gibt 0 Punkte.`,
     pickGameFirst: 'Such zuerst ein Spiel aus.',
     pickOneKid: 'Wähle mindestens ein Kind aus.',
     teamNeedsTwo: 'Für ein Teamspiel braucht ihr mindestens 2 Kinder.',
@@ -161,8 +177,9 @@ const STRINGS = {
     givePoint: (name) => `${name} einen Punkt geben`,
     confirmNoPoints: (group) => `In ${group ? 'dieser Gruppe' : 'diesem Spiel'} hat niemand Punkte bekommen. Trotzdem weiter?`,
     confirmCancelGame: (name) => `„${name}“ abbrechen? Die Punkte aus diesem Spiel werden nicht gespeichert.`,
-    bonusIfTwo: 'Wenn du es schaffst, bekommst du 2 Punkte, weil du gerade weit hinten liegst!',
-    bonusIfOne: 'Wenn du es schaffst, bekommst du 1 Punkt.',
+    bonusIf: (pts, reason) => (reason
+      ? `Wenn du es schaffst, bekommst du ${pts} Punkte, weil du gerade ${reasonDe[reason]}!`
+      : 'Wenn du es schaffst, bekommst du 1 Punkt.'),
     madeIt: 'Geschafft!',
     didntMakeIt: 'Nicht geschafft',
     winnerCrown: '👑 Sieger',
@@ -261,6 +278,9 @@ const STRINGS = {
     noNameMany: (n) => `${n} kids have no name yet.`,
     confirmRemoveKid: (label) => `Remove ${label}? Their points will be lost.`,
     theLastKid: 'the last kid',
+    kidN: (n) => `kid ${n}`,
+    removeKid: (label) => `Remove ${label}`,
+    removeKidTitle: 'Remove kid',
     confirmReset: 'Start a new party? All kids, games played and points will be deleted. The game list stays.',
 
     gamesTitle: 'Games',
@@ -287,10 +307,19 @@ const STRINGS = {
     noGamesYet: 'No games yet. Add a game above.',
     alreadyInList: (name) => `"${name}" is already in the list.`,
     confirmDeleteListGame: (name) => `Delete "${name}" from the list?`,
+    timeLabel: 'Time',
+    timerNone: 'None',
+    timerFor: (name) => `How much time is there for ${name}?`,
+    timerStart: '▶ Start',
+    timerResume: '▶ Resume',
+    timerPause: '⏸ Pause',
+    timerReset: '↺ Reset',
+    timeUp: "Time's up!",
     gamesNotes: [
       '<strong>Players:</strong> how many kids play at the same time. If there are more kids, they play in groups of equal size, drawn at random. Each group gets its own points.',
       '<strong>Team:</strong> All kids play together, drawn into Team Red and Team Blue. The winning team gets the points for 1st place, the other team the points for 2nd place. In a draw, everyone gets the points for 2nd place.',
-      '<strong>1 (bonus):</strong> Only the kid whose turn it is plays. Making it gives 1 point, or 2 points if they are more than 3 points behind the second-to-last kid.',
+      '<strong>1 (bonus):</strong> Only the kid whose turn it is plays. Making it gives 1 point. In last place it gives 2 points, and more than 3 points behind the second-to-last kid even 3 points.',
+      '<strong>Time:</strong> With a time set, the game shows an hourglass. The space bar starts and pauses it. When the time is up, a loud sound plays.',
       '<strong>Lucky wheel:</strong> Games that are switched off are not on the wheel. Each time a game is played, its slice gets half as big, until every game has had a turn. Bonus games come up half as often, but more often when the kid whose turn it is is far behind.',
     ],
 
@@ -311,7 +340,7 @@ const STRINGS = {
     playedBefore: 'Played before',
     none: 'None',
     teamPreview: '🔴🔵 Team game: the kids are drawn into Team Red and Team Blue.',
-    bonusNote: (name, pts, behind) => `Only <strong>${name}</strong> plays. Making it gives ${pts}${behind ? ", because you're far behind right now" : ''}. Not making it gives 0 points.`,
+    bonusNote: (name, pts, reason) => `Only <strong>${name}</strong> plays. Making it gives ${pts}${reason ? `, because you're ${reasonEn[reason]}` : ''}. Not making it gives 0 points.`,
     pickGameFirst: 'Pick a game first.',
     pickOneKid: 'Choose at least one kid.',
     teamNeedsTwo: 'A team game needs at least 2 kids.',
@@ -339,8 +368,9 @@ const STRINGS = {
     givePoint: (name) => `Give ${name} a point`,
     confirmNoPoints: (group) => `Nobody got any points in this ${group ? 'group' : 'game'}. Continue anyway?`,
     confirmCancelGame: (name) => `Cancel "${name}"? The points from this game won't be saved.`,
-    bonusIfTwo: "If you make it, you get 2 points, because you're far behind right now!",
-    bonusIfOne: 'If you make it, you get 1 point.',
+    bonusIf: (pts, reason) => (reason
+      ? `If you make it, you get ${pts} points, because you're ${reasonEn[reason]}!`
+      : 'If you make it, you get 1 point.'),
     madeIt: 'Made it!',
     didntMakeIt: "Didn't make it",
     winnerCrown: '👑 Winner',
